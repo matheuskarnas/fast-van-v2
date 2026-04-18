@@ -93,13 +93,15 @@ npm run web                 # Rodar na Web
 | RF  | Nome                    | Status          | Prioridade |
 | --- | ----------------------- | --------------- | ---------- |
 | 1   | Cadastro de Usuários    | ✅ Backend      | Alta       |
-| 2   | Cadastro de Veículos    | ⏳ Planejamento | Alta       |
+| 2   | Cadastro de Veículos    | 📝 Critérios definidos | Alta       |
 | 3   | Criação de Linhas       | ⏳ Planejamento | Alta       |
 | 4   | Links de Convite        | ⏳ Planejamento | Média      |
 | 5   | Notificação de Ausência | ⏳ Planejamento | Média      |
 | 6   | Chat Privado 1-to-1     | ⏳ Planejamento | Média      |
 | 7   | Chat Grupo + Alertas    | ⏳ Planejamento | Média      |
 | 8   | Off-line Sync           | ⏳ Planejamento | Baixa      |
+
+**RF2 documentado em:** [docs/RF2-criterios-aceite.md](docs/RF2-criterios-aceite.md)
 
 ## 🛠️ Stack Tecnológico
 

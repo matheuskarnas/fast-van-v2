@@ -158,12 +158,17 @@ Compartilhado
 
 ### 📋 Próximos
 
-- RF2: Cadastro de Veículos
+- RF2: Cadastro de Veículos (critérios de aceite documentados)
 - RF3: Criação de Linhas
 - Firebase: Chat em tempo real
 - Google Maps: Visualização de rotas
 - Redux: Estado global
 - Testes Detox: E2E tests
+
+### 📄 Critérios de aceite
+
+- [RF1](docs/RF1-criterios-aceite.md)
+- [RF2](docs/RF2-criterios-aceite.md)
 
 ## 🚀 Como Usar
 

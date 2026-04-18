@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const express = require("express");
 const authRoutes = require("./routes/authRoutes");
+const vehicleRoutes = require("./routes/vehicleRoutes");
 const { testConnection, closePool } = require("./config/database");
 
 const app = express();
@@ -40,6 +41,7 @@ app.get("/health", async (req, res) => {
 });
 
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/vehicles", vehicleRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
