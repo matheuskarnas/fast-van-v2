@@ -21,12 +21,20 @@ function validateVehiclePlate(plate) {
 function validateVehicleYear(year) {
   const numericYear = Number(year);
   const currentYear = new Date().getFullYear();
-  return Number.isInteger(numericYear) && numericYear >= 1980 && numericYear <= currentYear + 1;
+  return (
+    Number.isInteger(numericYear) &&
+    numericYear >= 1980 &&
+    numericYear <= currentYear + 1
+  );
 }
 
 function validateVehicleCapacity(capacity) {
   const numericCapacity = Number(capacity);
-  return Number.isInteger(numericCapacity) && numericCapacity >= 1 && numericCapacity <= 80;
+  return (
+    Number.isInteger(numericCapacity) &&
+    numericCapacity >= 1 &&
+    numericCapacity <= 80
+  );
 }
 
 function mapVehicleRowToDomain(row) {
@@ -60,7 +68,11 @@ async function findVehicleByPlate(plate) {
     return mapVehicleRowToDomain(result.rows[0]);
   }
 
-  return mockVehicleDatabase.vehicles.find((vehicle) => vehicle.plate === normalizedPlate) || null;
+  return (
+    mockVehicleDatabase.vehicles.find(
+      (vehicle) => vehicle.plate === normalizedPlate,
+    ) || null
+  );
 }
 
 async function createVehicle(driverId, vehicleData) {
@@ -90,7 +102,11 @@ async function createVehicle(driverId, vehicleData) {
 
     const requiredFields = ["plate", "model", "year", "capacity"];
     for (const field of requiredFields) {
-      if (vehicleData[field] === undefined || vehicleData[field] === null || String(vehicleData[field]).trim() === "") {
+      if (
+        vehicleData[field] === undefined ||
+        vehicleData[field] === null ||
+        String(vehicleData[field]).trim() === ""
+      ) {
         return {
           success: false,
           error: {
@@ -221,7 +237,9 @@ async function getVehiclesByDriver(driverId) {
       };
     }
 
-    const vehicles = mockVehicleDatabase.vehicles.filter((vehicle) => vehicle.driverId === driverId);
+    const vehicles = mockVehicleDatabase.vehicles.filter(
+      (vehicle) => vehicle.driverId === driverId,
+    );
     return {
       success: true,
       vehicles,

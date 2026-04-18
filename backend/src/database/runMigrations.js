@@ -6,7 +6,9 @@ const { query, shouldUseDatabase, closePool } = require("../config/database");
 
 async function run() {
   if (!shouldUseDatabase()) {
-    console.log("Skipping migrations: DATABASE_URL not configured or USE_MOCK_DB=true");
+    console.log(
+      "Skipping migrations: DATABASE_URL not configured or USE_MOCK_DB=true",
+    );
     return;
   }
 

@@ -78,12 +78,13 @@ fast-van-mobile/
 |---|---|---|
 | (auth)/login | - | Tela de login |
 | (auth)/register | RF1 | Cadastro de Usuários |
-| (passenger)/home | RF1+ | Home do passageiro |
-| (driver)/register-vehicle | RF2 | Cadastro de Veículos |
-| (passenger)/lines | RF3 | Criação e Ingresso em Linhas |
-| shared/alerts | RF7 | Alertas do Sistema |
-| (passenger)/chat & (driver)/chat | RF6 | Chat Privado 1-to-1 |
-| shared/chat-group | RF7 | Chat em Grupo da Linha |
+| (passenger)/home | RF1 | Home do passageiro |
+| (driver)/register-vehicle | RF2 | Cadastro de Veículos (parte de RF2) |
+| (driver)/create-line | RF2 | Cadastro e Gerenciamento de Rotas |
+| (passenger)/lines | RF3 | Confirmação de Presença pelo Aluno |
+| shared/alerts | RF4 | Visualização de Ocupação em Tempo Real |
+| (passenger)/chat & (driver)/chat | RF10 | Chat Privado 1-to-1 |
+| shared/chat-group | RF10 | Chat em Grupo da Linha |
 
 ## 🚀 Como Iniciar
 

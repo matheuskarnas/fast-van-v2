@@ -1,6 +1,9 @@
 const express = require("express");
 const { requireAuth } = require("../middlewares/authMiddleware");
-const { createVehicle, getVehiclesByDriver } = require("../services/vehicleService");
+const {
+  createVehicle,
+  getVehiclesByDriver,
+} = require("../services/vehicleService");
 
 const router = express.Router();
 

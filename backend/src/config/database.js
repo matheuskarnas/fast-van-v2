@@ -3,7 +3,9 @@ const { Pool } = require("pg");
 let pool;
 
 function shouldUseDatabase() {
-  return process.env.USE_MOCK_DB !== "true" && Boolean(process.env.DATABASE_URL);
+  return (
+    process.env.USE_MOCK_DB !== "true" && Boolean(process.env.DATABASE_URL)
+  );
 }
 
 function getPool() {
@@ -27,7 +29,9 @@ async function query(text, params) {
   const dbPool = getPool();
 
   if (!dbPool) {
-    throw new Error("Database is not configured. Set DATABASE_URL and USE_MOCK_DB=false.");
+    throw new Error(
+      "Database is not configured. Set DATABASE_URL and USE_MOCK_DB=false.",
+    );
   }
 
   return dbPool.query(text, params);
