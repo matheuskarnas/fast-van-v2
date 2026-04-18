@@ -243,8 +243,8 @@ Requisitos (todos obrigatórios):
 - [ ] Middleware de autenticação
 - [ ] Rate limiting
 - [ ] Swagger/OpenAPI docs
-- [x] RF2: Cadastro de Veículos (critérios documentados)
-- [ ] RF3: Criação de Linhas
+- [x] RF2: Cadastro de Veículos e Gerenciamento de Rotas (critérios documentados)
+- [x] RF3: Confirmação de Presença pelo Aluno (critérios + testes + serviço)
 - [ ] Firebase: Chat em tempo real
 - [ ] Emails transacionais
 - [ ] Logs estruturados
@@ -253,6 +253,7 @@ Requisitos (todos obrigatórios):
 
 - RF1: [docs/RF1-criterios-aceite.md](../docs/RF1-criterios-aceite.md)
 - RF2: [docs/RF2-criterios-aceite.md](../docs/RF2-criterios-aceite.md)
+- RF3: [docs/RF3-criterios-aceite.md](../docs/RF3-criterios-aceite.md)
 
 ## 🧪 Exemplo de Teste
 

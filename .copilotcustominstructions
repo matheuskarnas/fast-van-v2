@@ -266,35 +266,15 @@ A ideia é ser sempre um design intuitivo e limpo, a ideia do APP não é reter 
 
 ### Requisito funcional 1
 
-Dado um usuário sem cadastro
-
-Ele não deve ter acesso a nenhuma funcionalidade do APP
-
-Deve se cadastrar em uma das opções Motorista/Passageiro
-
-Após cadastrado deve ai sim ter acesso ao APP, mas apenas as funcionalidades da sua role
+Critérios oficiais em: [docs/RF1-criterios-aceite.md](./docs/RF1-criterios-aceite.md)
 
 ### Requisito funcional 2
 
-Dado um motorista cadastrado e logado
-
-Ele deve ter um veiculo cadastrado para poder criar uma linha
-
-Com pelo menos 1 veiculo cadastrado ele pode criar uma linha, nela ele deve informar Local de partida (cidade) local de destino (Fatec-sjc) horário de chegada no destino e horário de retorno do destino, capacidade da van vem da herança do veiculo.
-
-Ele deve adicionar e remover pontos de embarque e desembarque de acordo com a demanda, sempre atrelando a 1 ou mais usuários
-
-Deve poder gerar link de convite para novos passageiros, quando o passageiro entrar ele deve atrelar o passageiro a um ponto de embarque e um de desembarque
+Critérios oficiais em: [docs/RF2-criterios-aceite.md](./docs/RF2-criterios-aceite.md)
 
 ### Requisito funcional 3
 
-Os passageiros sempre estão marcados como presentes por padrão
-
-Dado a necessidade de ausência o passageiro pode escolher a melhor opção (não vai nem volta, só vai e só volta)
-
-Caso a linha tenha dois horários de ida e de volta e o passageiro precise informar isso ele pode informar por um botão(hoje vou na ida das 8:00 ou volta na linha das 10:55)
-
-podendo informar isso até o horário de embarque
+Critérios oficiais em: [docs/RF3-criterios-aceite.md](./docs/RF3-criterios-aceite.md)
 
 ### Requisito funcional 4
 

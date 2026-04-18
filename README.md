@@ -31,7 +31,9 @@ fast-van-v2/
 │   └── README_ESTRUTURA.md
 │
 ├── docs/                        # Documentação
-│   └── RF1-criterios-aceite.md # Critérios de aceitação RF1
+│   ├── RF1-criterios-aceite.md # Critérios de aceitação RF1
+│   ├── RF2-criterios-aceite.md # Critérios de aceitação RF2
+│   └── RF3-criterios-aceite.md # Critérios de aceitação RF3
 │
 └── README.md                    # Este arquivo
 ```
@@ -90,18 +92,22 @@ npm run web                 # Rodar na Web
 
 ## 📋 Funcionalidades (MVP)
 
-| RF  | Nome                    | Status                 | Prioridade |
-| --- | ----------------------- | ---------------------- | ---------- |
-| 1   | Cadastro de Usuários    | ✅ Backend             | Alta       |
-| 2   | Cadastro de Veículos    | 📝 Critérios definidos | Alta       |
-| 3   | Criação de Linhas       | ⏳ Planejamento        | Alta       |
-| 4   | Links de Convite        | ⏳ Planejamento        | Média      |
-| 5   | Notificação de Ausência | ⏳ Planejamento        | Média      |
-| 6   | Chat Privado 1-to-1     | ⏳ Planejamento        | Média      |
-| 7   | Chat Grupo + Alertas    | ⏳ Planejamento        | Média      |
-| 8   | Off-line Sync           | ⏳ Planejamento        | Baixa      |
+| RF  | Nome                                          | Status                 | Prioridade |
+| --- | --------------------------------------------- | ---------------------- | ---------- |
+| 1   | Cadastro de Usuários                          | ✅ Backend + Critérios | Alta       |
+| 2   | Cadastro e Gerenciamento de Rotas             | ✅ Backend + Critérios | Alta       |
+| 3   | Confirmação de Presença pelo Aluno            | ✅ Backend + Critérios | Alta       |
+| 4   | Visualização de Ocupação da Van em Tempo Real | ⏳ Planejamento        | Média      |
+| 5   | Sistema de Alerta de Lotação Crítica          | ⏳ Planejamento        | Média      |
+| 6   | Lista de Espera e Chamada de Van Extra        | ⏳ Planejamento        | Média      |
+| 7   | Check-in por Geofencing (Sensor de GPS)       | ⏳ Planejamento        | Média      |
+| 8   | Registro de Ausência de Última Hora           | ⏳ Planejamento        | Baixa      |
 
-**RF2 documentado em:** [docs/RF2-criterios-aceite.md](docs/RF2-criterios-aceite.md)
+**Critérios oficiais:**
+
+- RF1: [docs/RF1-criterios-aceite.md](docs/RF1-criterios-aceite.md)
+- RF2: [docs/RF2-criterios-aceite.md](docs/RF2-criterios-aceite.md)
+- RF3: [docs/RF3-criterios-aceite.md](docs/RF3-criterios-aceite.md)
 
 ## 🛠️ Stack Tecnológico
 
@@ -126,6 +132,8 @@ npm run web                 # Rodar na Web
 ## 📚 Documentação
 
 - [RF1 - Critérios de Aceitação](./docs/RF1-criterios-aceite.md) - Detalhes de validações e cenários de teste
+- [RF2 - Critérios de Aceitação](./docs/RF2-criterios-aceite.md) - Cadastro e gerenciamento de rotas
+- [RF3 - Critérios de Aceitação](./docs/RF3-criterios-aceite.md) - Confirmação de presença do aluno
 - [Estrutura Mobile](./mobile/README_ESTRUTURA.md) - Organização do app mobile
 
 ## 🔄 Fluxo de Trabalho (TDD)

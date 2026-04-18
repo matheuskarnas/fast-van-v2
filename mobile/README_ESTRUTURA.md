@@ -21,7 +21,7 @@ fast-van-mobile/
 │       │   ├── profile.tsx      # Perfil do passageiro
 │       │   └── chat/
 │       │       ├── _layout.tsx
-│       │       ├── index.tsx    # RF6: Lista de conversas privadas
+│       │       ├── index.tsx    # RF13: Lista de conversas privadas
 │       │       └── [id].tsx     # Chat privado com motorista
 │       ├── (driver)/            # Funcionalidades de Motorista
 │       │   ├── _layout.tsx      # Bottom Tab Navigator
@@ -35,9 +35,9 @@ fast-van-mobile/
 │       │       └── [id].tsx     # Chat privado com passageiro
 │       └── shared/              # Funcionalidades compartilhadas
 │           ├── _layout.tsx
-│           ├── alerts.tsx       # RF7: Alertas do sistema
+│           ├── alerts.tsx       # RF4/RF5: Ocupação e alertas de lotação
 │           ├── maps.tsx         # Mapa da rota
-│           └── chat-group.tsx   # RF7: Chat em grupo da linha
+│           └── chat-group.tsx   # RF13: Chat em grupo da linha
 │
 ├── components/                   # Componentes reutilizáveis
 │   ├── auth/                    # Componentes de autenticação
@@ -74,17 +74,17 @@ fast-van-mobile/
 
 ## 🎯 Mapeamento com Requirements (RF)
 
-| Pasta/Screen | RF | Funcionalidade |
-|---|---|---|
-| (auth)/login | - | Tela de login |
-| (auth)/register | RF1 | Cadastro de Usuários |
-| (passenger)/home | RF1 | Home do passageiro |
-| (driver)/register-vehicle | RF2 | Cadastro de Veículos (parte de RF2) |
-| (driver)/create-line | RF2 | Cadastro e Gerenciamento de Rotas |
-| (passenger)/lines | RF3 | Confirmação de Presença pelo Aluno |
-| shared/alerts | RF4 | Visualização de Ocupação em Tempo Real |
-| (passenger)/chat & (driver)/chat | RF10 | Chat Privado 1-to-1 |
-| shared/chat-group | RF10 | Chat em Grupo da Linha |
+| Pasta/Screen                     | RF      | Funcionalidade                                |
+| -------------------------------- | ------- | --------------------------------------------- |
+| (auth)/login                     | -       | Tela de login                                 |
+| (auth)/register                  | RF1     | Cadastro de Usuários                          |
+| (passenger)/home                 | RF1     | Home do passageiro                            |
+| (driver)/register-vehicle        | RF2     | Cadastro de Veículos (parte de RF2)           |
+| (driver)/create-line             | RF2     | Cadastro e Gerenciamento de Rotas             |
+| (passenger)/lines                | RF3     | Confirmação de Presença pelo Aluno            |
+| shared/alerts                    | RF4/RF5 | Visualização de Ocupação e Alertas de Lotação |
+| (passenger)/chat & (driver)/chat | RF13    | Chat Privado 1-to-1                           |
+| shared/chat-group                | RF13    | Chat em Grupo da Linha                        |
 
 ## 🚀 Como Iniciar
 
