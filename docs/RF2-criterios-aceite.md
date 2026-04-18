@@ -135,7 +135,7 @@ Permitir que um usuário com perfil de Motorista cadastre um ou mais veículos n
 
 ### Objetivo
 
-Permitir que um motorista autenticado, com pelo menos um veículo cadastrado, crie linhas (rotas) de transporte definindo cidade de origem e destino. Os pontos de embarque/desembarque são adicionados conforme passageiros entram na linha, e um segundo motorista pode ser atrelado à linha caso necessário.
+Permitir que um motorista autenticado, com pelo menos um veículo cadastrado, crie linhas (rotas) de transporte definindo cidade de origem e destino. Toda linha é composta por ida e volta por padrão. Os pontos de embarque/desembarque são adicionados conforme passageiros entram na linha, e um segundo motorista pode ser atrelado à linha caso necessário.
 
 ---
 
@@ -161,6 +161,11 @@ Permitir que um motorista autenticado, com pelo menos um veículo cadastrado, cr
 - `departure_time` - Horário de partida (formato HH:mm) - pode ser definido depois
 - `arrival_time` - Horário de chegada no destino (formato HH:mm) - pode ser definido depois
 - `return_time` - Horário de retorno do destino (formato HH:mm) - pode ser definido depois
+
+### Composição da linha
+
+- Toda linha possui ida e volta por padrão desde a criação
+- Mesmo sem horários preenchidos no momento da criação, a volta já faz parte da linha
 
 ### Capacidade
 
@@ -191,6 +196,7 @@ Permitir que um motorista autenticado, com pelo menos um veículo cadastrado, cr
 **Então** a linha é criada no sistema
 **E** fica vinculada ao motorista dono da van
 **E** a capacidade é herdada do veículo selecionado
+**E** a linha é criada com ida e volta por padrão
 **E** a linha começa SEM pontos de embarque/desembarque
 **E** a linha pode ser listada para esse motorista posteriormente
 **E** a linha pode receber passageiros que acionam pontos conforme necessário
