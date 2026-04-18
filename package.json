@@ -1,0 +1,44 @@
+{
+  "name": "fastvan",
+  "version": "0.1.0",
+  "description": "Aplicativo para facilitar o dia-a-dia de passageiros e motoristas de vans",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "scripts": {
+    "backend:install": "cd backend && npm install",
+    "backend:test": "./backend/node_modules/.bin/jest --verbose",
+    "backend:test:watch": "./backend/node_modules/.bin/jest --watch",
+    "backend:test:coverage": "./backend/node_modules/.bin/jest --coverage",
+    "backend:test:rf1": "./backend/node_modules/.bin/jest RF1-cadastro-usuarios.test.js --verbose",
+    "backend:dev": "cd backend && npm run dev",
+    "backend:start": "cd backend && npm start",
+    "mobile:install": "cd mobile && npm install",
+    "mobile:start": "cd mobile && npm start",
+    "mobile:android": "cd mobile && npm run android",
+    "mobile:ios": "cd mobile && npm run ios",
+    "mobile:web": "cd mobile && npm run web",
+    "install:all": "npm install && npm run backend:install && npm run mobile:install",
+    "test": "./backend/node_modules/.bin/jest --verbose",
+    "test:watch": "./backend/node_modules/.bin/jest --watch",
+    "test:coverage": "./backend/node_modules/.bin/jest --coverage",
+    "dev": "cd backend && npm run dev",
+    "lint": "cd backend && npm run lint"
+  },
+  "keywords": [
+    "van",
+    "transporte",
+    "passageiros",
+    "motoristas",
+    "react-native",
+    "node.js"
+  ],
+  "author": "",
+  "license": "MIT",
+  "workspaces": [
+    "backend",
+    "mobile"
+  ]
+}
