@@ -557,7 +557,9 @@ Caso não tenha um veiculo cadastrado a primeira tela será de cadastro de van
 
 1. Front-end Mobile
 
-Framework: React Native.
+Framework: React Native com Expo.
+
+Build e distribuição: Expo/EAS para geração de builds e distribuição em ambiente de teste e produção.
 
 Componentes de Interface: Devem ser utilizadas FlatLists otimizadas para garantir a performance em dispositivos limitados.
 
@@ -565,7 +567,9 @@ Testes: Uso de ferramentas como Detox ou Jest para testes de interface.
 
 2. Back-end e Banco de Dados
 
-Banco de Dados Principal: PostgreSQL (banco de dados relacional) para garantir a integridade referencial e consultas complexas.
+Back-end: API Node.js com Express, preparada para deploy no Render (plano free no inicio, com possibilidade de upgrade).
+
+Banco de Dados Principal: Supabase (PostgreSQL free) para garantir a integridade referencial e consultas complexas.
 
 Documentação de API: Deve ser documentada com Swagger/OpenAPI e possuir versionamento (ex: /api/v1/).
 
@@ -575,7 +579,7 @@ Autenticação: Uso de tokens JWT (JSON Web Tokens) para gerenciamento de sessõ
 
 APIs de Mapas: Integração com Google Maps Platform ou Mapbox.
 
-Notificações e Chat: \* Firebase Cloud Messaging para notificações push.
+Notificações e Chat: Firebase Cloud Messaging para notificações push.
 
 Firebase para o chat e sincronização instantânea.
 
