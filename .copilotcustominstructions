@@ -1,0 +1,607 @@
+# Projeto: fastvan
+
+## Fluxo de trabalho
+
+Vamos trabalhar como pair programming, basicamente eu vou te dar as instruções e você vai executar o código, eu vou avaliar o código escrito e aprovar
+
+A programação vai ser o orientada a teste, ou seja, primeiro vamos entender a funcionalidade, depois criar os testes e depois sim criar a funcionalidade
+
+## Ideia do APP
+
+Vai ser um APP para celular.
+
+A função do aplicativo vai ser facilitar o dia-a-dia de passageiros e motoristas de vans
+
+Motoristas de vans tem linhas fixas com passageiros fixos, tanto para empresas quanto para escolas e universidades.
+
+A ideia é ser sempre um design intuitivo e limpo, a ideia do APP não é reter o usuário por muito tempo dentro dele e sim resolver um problema e facilitar a vida.
+
+## Backlog
+
+### Requisitos funcionais
+
+1. Cadastro de Usuários com Perfis Distintos: O aplicativo deve permitir o
+   cadastro de dois tipos de usuários: "Aluno" e "Motorista", cada um com campos
+   específicos (para motoristas, dados da van, capacidade, CNH). Este requisito é
+   fundamental para estruturar a lógica de permissões e funcionalidades
+   diferentes no sistema, usando o conceito de herança ou composição de
+   perfis no banco de dados e na interface.
+
+2. Cadastro e Gerenciamento de Rotas pelo Motorista: O motorista deve poder
+   cadastrar suas rotas fixas (ex: "Entrada 7h", "Saída 12h", "Noturno"), definindo
+   horários, pontos de parada e a capacidade máxima de alunos para cada rota.
+   Este requisito coloca o motorista como administrador da sua oferta de serviço.
+
+3. Confirmação de Presença pelo Aluno: O aluno, após logado, deve visualizar
+   as rotas disponíveis (ex: "Van da Manhã - Entrada 7h") e Informar se não vai estar
+   presente naquele dia para aquele trajeto. Esta é a funcionalidade central para
+   resolver o problema de comunicação, ensinando a lógica de confirmações
+   diárias e o gerenciamento de estados (presente/ausente).
+
+4. Visualização de Ocupação da Van em Tempo Real: O motorista deve ter
+   uma tela que mostre, para cada rota do dia, quantos alunos confirmaram
+   presença e a lista de quem são, facilitando a decisão de levar uma ou duas
+   vans.
+
+5. Sistema de Alerta de Lotação Crítica: O sistema deve disparar um alerta
+   para o motorista quando o número de confirmações para uma determinada rota
+   ultrapassar 80% da capacidade da van, permitindo que ele se programe para
+   chamar um veículo reserva com antecedência. Este requisito introduz lógica
+   de negócio proativa e ensina a implementar notificações baseadas em regras.
+
+6. Lista de Espera e Chamada de Van Extra: Quando a capacidade máxima for
+   atingida, os alunos que confirmarem após a lotação devem entrar
+   automaticamente em uma "lista de espera". O motorista poderá visualizar essa
+   lista e, ao acionar uma van extra, confirmar automaticamente todos os alunos
+   da lista. Este requisito resolve o problema da chamada de última hora,
+   ensinando filas e confirmação em lote.
+
+7. Check-in por Geofencing (Sensor de GPS): Utilizando o GPS do celular, o
+   aplicativo deve permitir que o motorista faça o check-in ao chegar em um ponto
+   de embarque pré-definido. Os alunos próximos receberiam uma notificação de
+   que a van chegou. Este requisito ensina a usar o sensor de localização e o
+   conceito de geofencing, adicionando automação e precisão ao processo.
+
+8. Registro de Ausência de Última Hora: O aluno deve poder marcar-se como presente mesmo após ter confirmado sua ausência, com um limite do horário do embarque, caso ainda tenha vaga. Esta funcionalidade reflete a realidade de imprevistos.
+
+9. Painel de Decisão para o Motorista (Uma ou Duas Vans): Uma tela
+   específica para o motorista noturno que consolida as confirmações de
+   presença para a saída e sugere, baseado no número total de alunos, se é
+   necessário utilizar uma ou duas vans, com a possibilidade de ele confirmar a
+   decisão no sistema. Este requisito aborda diretamente a economia de custo
+   operacional.
+
+10. Módulo para Contratação de Serviços Empresariais (B2B): Uma seção
+    separada onde empresas podem se cadastrar e criar solicitações de transporte
+    para seus funcionários em horários comerciais, especificando rota, horários e
+    número de passageiros. Este requisito expande o negócio e ensina a criar
+    fluxos de cadastro e busca especializados.
+
+11. Busca de Motoristas Disponíveis para Empresas: Motoristas poderão
+    marcar sua disponibilidade para pegar "linhas de empresa" nos períodos
+    ociosos (ex: entre 9h e 17h). As empresas poderão buscar motoristas
+    disponíveis na região e enviar propostas de contratação. Este requisito
+    implementa um marketplace simples, ensinando lógica de busca por
+    disponibilidade e localização.
+
+12. Mural de Eventos e Contratação para Finais de Semana: Uma
+    funcionalidade onde passageiros interessados em eventos (shows, jogos, feiras) podem
+    publicar demandas de transporte, e motoristas podem se candidatar para
+    oferecer o serviço. Este requisito cria um novo canal de negócios e ensina a
+    lógica de postagem e candidatura.
+
+13. Chat Integrado entre Aluno e Motorista: Um chat simples para comunicação
+    direta sobre imprevistos (ex: "Estou atrasado, pode esperar 2 minutos?"),
+    evitando o uso do WhatsApp e centralizando a comunicação. Este requisito
+    ensina a implementar uma comunicação em tempo real básica, possivelmente
+    utilizando Firebase.
+
+14. Avaliação de Viagens: Após o término de uma viagem (ex: chegada na
+    faculdade ou em casa), alunos podem avaliar o motorista, e motoristas podem
+    avaliar os alunos (pontualidade, educação). Este requisito é importante para
+    criar reputação e confiança na comunidade, ensinando coleta e exibição de
+    feedback.
+
+15. Histórico de Viagens e Relatórios: Uma tela para o motorista visualizar seu
+    histórico de viagens, número de alunos transportados, dias em que usou uma
+    ou duas vans, e faturamento estimado. Para os alunos, um histórico de suas
+    confirmações e presenças. Este requisito ensina a gerar relatórios simples e
+    dashboards a partir dos dados coletados.
+
+16. Sistema de Notificações Push: O aplicativo deve enviar notificações para
+    eventos importantes: confirmação de presença, lembrete de viagem no dia
+    anterior, aviso de lotação crítica, confirmação de van extra. Este requisito é
+    vital para manter todos informados em tempo real e ensina a integrar o serviço
+    de notificações push (como Firebase Cloud Messaging).
+
+17. Gerenciamento de Múltiplas Vans pelo Motorista: O motorista que possui
+    mais de um veículo (como no caso noturno) deve poder cadastrar ambas as
+    vans no sistema, com suas respectivas capacidades e características, e
+    associá-las às rotas quando necessário. Este requisito permite uma gestão de
+    frota simples.
+
+18. Definição de Pontos de Encontro no Mapa: O motorista, ao cadastrar uma
+    rota, deve poder marcar os pontos de embarque/desembarque em um mapa,
+    utilizando a API de mapas. Os alunos visualizam esses pontos e podem ver a
+    distância de sua localização atual. Este requisito ensina integração com mapas
+    e geolocalização.
+
+19. Sugestão de Novos Pontos de Embarque: Alunos podem sugerir novos
+    pontos de embarque para uma rota existente, que ficam pendentes para
+    aprovação do motorista. Esta funcionalidade colaborativa ensina a
+    implementar fluxos de aprovação e moderação de conteúdo gerado pelo
+    usuário.
+
+20. Registro de Preferências do Aluno: O aluno pode definir suas preferências
+    padrão, como "ponto de embarque mais comum" e se costuma ir e voltar todos
+    os dias, agilizando o processo de confirmação diária. Este requisito melhora a
+    experiência do usuário e ensina a salvar e recuperar configurações
+    personalizadas.
+
+21. Modo Off-line com Sincronização: O aplicativo deve permitir que alunos
+    confirmem presença mesmo sem conexão com a internet. As confirmações
+    são salvas localmente e sincronizadas com o servidor assim que a conexão for
+    restabelecida. Este requisito ensina o uso de armazenamento local
+    (AsyncStorage, SQLite) e estratégias de sincronização de dados.
+
+22. Cálculo de Distância e Tempo de Viagem: Utilizando APIs de rotas, o
+    aplicativo pode estimar a distância total e o tempo de uma rota baseado nos
+    pontos de embarque cadastrados, auxiliando o motorista no planejamento.
+    Este requisito ensina a consumir APIs de mapa para cálculos úteis ao negócio.
+
+23. Registro de Ocorrências: Uma funcionalidade para registrar ocorrências
+    durante a viagem (ex: trânsito intenso, acidente, aluno que não apareceu no
+    ponto), que pode ser usada posteriormente para justificativas ou melhoria das
+    rotas. Este requisito introduz um elemento de "log" e auditoria.
+
+24. Controle de Pagamentos Simples: Um módulo básico para registrar os
+    pagamentos dos alunos (mensalidade ou por viagem), com status de "pago" ou
+    "pendente", visível para o motorista. O aluno pode consultar seu histórico de
+    pagamentos. Este requisito aborda a gestão financeira simples, sem
+    integração com gateways de pagamento complexos.
+
+25. Notificação de Alunos Esquecidos: Se um aluno confirmou presença mas o
+    motorista não o encontrou no ponto e já partiu, o motorista pode marcar o aluno
+    como "não embarcou", e o sistema envia automaticamente uma notificação
+    para o aluno informando que a van partiu sem ele. Este requisito trata da
+    responsabilidade e comunicação em casos de falha.
+
+26. Dashboard para o Aluno: Uma tela para o aluno visualizar suas próximas
+    viagens confirmadas, histórico de presenças e ausências, e eventuais
+    pendências financeiras. Isso dá transparência e controle para o usuário sobre
+    sua utilização do serviço.
+
+27. Solicitação de Viagem sob Demanda para Eventos: No módulo de eventos,
+    usuários comuns (não empresas) podem solicitar orçamentos para transporte
+    em grupo para um show ou jogo, e motoristas disponíveis podem responder
+    com propostas. Isso expande o uso do aplicativo para além das rotas fixas.
+
+28. Integração com Calendário do Celular: O aluno pode exportar suas
+    confirmações de viagem para o aplicativo de calendário do seu celular,
+    garantindo que os lembretes de horário de saída apareçam em sua agenda
+    pessoal. Este requisito ensina a integração com os aplicativos nativos do
+    sistema.
+
+29. Enquetes Rápidas para o Motorista: O motorista pode criar enquetes
+    rápidas para os alunos de uma rota (ex: "Na sexta-feira, podemos sair 30
+    minutos mais cedo?") para tomar decisões coletivas de forma democrática.
+    Este requisito adiciona uma camada de interação e engajamento.
+
+30. Relatório de Ocupação e Economia: Um relatório detalhado para o
+    motorista que cruza dados de confirmações, ausências e capacidade,
+    mostrando quantas vezes ele economizou ao usar apenas uma van e qual a
+    economia estimada. Este requisito entrega valor direto ao negócio do
+    motorista, justificando o uso do aplicativo.
+
+### Requisitos não funcionais
+
+1. Arquitetura de Back-end Escalável com Banco de Dados Relacional: O
+   sistema deve ser construído com um back-end robusto, utilizando um banco de
+   dados relacional como PostgreSQL. A estrutura de dados envolve
+   relacionamentos complexos (usuários, rotas, confirmações, vans), e um banco
+   SQL é ideal para garantir a integridade referencial e permitir consultas
+   complexas para os relatórios e dashboards.
+
+2. Autenticação Segura e Controle de Acesso: Deve ser implementado um
+   sistema de autenticação seguro, utilizando tokens JWT (JSON Web Tokens)
+   para gerenciar as sessões dos usuários. O controle de acesso deve ser
+   rigoroso, garantindo que alunos só vejam e modifiquem seus próprios dados, e
+   que motoristas tenham acesso apenas às suas rotas e alunos associados,
+   protegendo a privacidade de todos.
+
+3. Interface Responsiva e Foco em Usabilidade (UX): O aplicativo,
+   desenvolvido em React Native, deve priorizar a simplicidade e a rapidez de
+   ações. Como o uso se dá em contextos de pressa (confirmações rápidas,
+   motorista dirigindo), a interface deve ter poucos cliques, botões grandes e
+   informações claras, testando o aplicativo com usuários reais para validar a
+   experiência.
+
+4. Uso de Geotecnologias (APIs de Mapas Gratuitas): Para as funcionalidades
+   de mapa e geofencing, o aplicativo deverá integrar-se com APIs gratuitas como
+   a Google Maps Platform (com limites generosos) ou Mapbox (que oferece bom
+   nível gratuito). A escolha deve considerar a precisão e a disponibilidade na
+   região de uso.
+
+5. Notificações em Tempo Real com Serviço Gratuito: Para o chat e os alertas
+   de lotação, o sistema deve empregar um serviço de tempo real. Uma opção
+   gratuita e eficiente é o Firebase Cloud Messaging para notificações push e o
+   Firebase para o chat e sincronização de
+   confirmações, garantindo que as informações cheguem instantaneamente a
+   todos.
+
+6. Estratégia de Cache e Sincronização Off-line: O aplicativo deve implementar
+   uma estratégia de cache local (como Redux Persist ou MMKV) para garantir
+   que as listas de rotas e confirmações possam ser acessadas rapidamente. A
+   funcionalidade de confirmação off-line exige um banco de dados local (SQLite)
+   e uma fila de sincronização para enviar as alterações ao servidor quando a
+   conexão for restabelecida.
+
+7. Segurança de Dados e Conformidade com LGPD: Como o aplicativo lida
+   com dados de localização e informações pessoais de alunos e motoristas,
+   deve-se implementar medidas de segurança como criptografia de dados
+   sensíveis no banco de dados. Além disso, é preciso criar uma política de
+   privacidade clara e obter consentimento dos usuários para o uso de seus
+   dados, conforme a Lei Geral de Proteção de Dados (LGPD).
+
+8. Performance em Dispositivos com Recursos Limitados: O aplicativo deve ser
+   otimizado para rodar suavemente em uma ampla gama de dispositivos Android
+   e iOS, incluindo modelos mais antigos que possam ter menos memória e
+   processamento. Isso inclui otimizar as listas (FlatList), evitar vazamentos de
+   memória e comprimir imagens, se houver.
+
+9. Versionamento de API e Documentação: O back-end deve ter suas APIs
+   versionadas (ex: /api/v1/) e documentadas, preferencialmente com ferramentas
+   como Swagger/OpenAPI. Isso facilita a manutenção e a evolução do sistema,
+   permitindo que futuras versões do aplicativo mobile sejam desenvolvidas sem
+   quebrar a compatibilidade com versões anteriores.
+
+10. Testes Automatizados nos Fluxos Críticos: Os fluxos principais do
+    aplicativo (confirmação de presença, visualização de lotação, check-in por
+    GPS) devem ser cobertos por testes automatizados. No back-end, testes de
+    unidade e integração; no front-end mobile, testes de interface com ferramentas
+    como Detox ou Jest, garantindo a confiabilidade do sistema que será usado
+    diariamente.
+
+## Critérios de aceitação
+
+### Requisito funcional 1
+
+Dado um usuário sem cadastro
+
+Ele não deve ter acesso a nenhuma funcionalidade do APP
+
+Deve se cadastrar em uma das opções Motorista/Passageiro
+
+Após cadastrado deve ai sim ter acesso ao APP, mas apenas as funcionalidades da sua role
+
+### Requisito funcional 2
+
+Dado um motorista cadastrado e logado
+
+Ele deve ter um veiculo cadastrado para poder criar uma linha
+
+Com pelo menos 1 veiculo cadastrado ele pode criar uma linha, nela ele deve informar Local de partida (cidade) local de destino (Fatec-sjc) horário de chegada no destino e horário de retorno do destino, capacidade da van vem da herança do veiculo.
+
+Ele deve adicionar e remover pontos de embarque e desembarque de acordo com a demanda, sempre atrelando a 1 ou mais usuários
+
+Deve poder gerar link de convite para novos passageiros, quando o passageiro entrar ele deve atrelar o passageiro a um ponto de embarque e um de desembarque
+
+### Requisito funcional 3
+
+Os passageiros sempre estão marcados como presentes por padrão
+
+Dado a necessidade de ausência o passageiro pode escolher a melhor opção (não vai nem volta, só vai e só volta)
+
+Caso a linha tenha dois horários de ida e de volta e o passageiro precise informar isso ele pode informar por um botão(hoje vou na ida das 8:00 ou volta na linha das 10:55)
+
+podendo informar isso até o horário de embarque
+
+### Requisito funcional 4
+
+Dado linhas criadas e funcionando o motorista tem acesso a quantos então confirmados para a linha separando de ida e volta
+
+### Requisito funcional 5
+
+dado uma lotação seja igual ou maior a 80% ele deve receber um alerta e caso passe de 100% ele deve receber outro alerta informando que a capacidade foi excedida.
+
+### Requisito funcional 6
+
+Dado um passageiro que vai em horário excepcional, está cadastrado para ir as 7:10 mas hoje vai as 8:00 ele deve informar isso como descritor no requisito funcional 3 e caso esse horário esteja lotado ele entra em uma fila de espera, caso alguém desse horário informe que não vai o primeiro da fila entra, caso tenha lugar ele já entra diretamente
+
+### Requisito funcional 7
+
+Dado uma linha programada, sempre que o motorista chegar a um ponto de embarque os passageiros confirmados do próximo ponto devem ser avisados que o motorista está proximo
+
+### Requisito funcional 8
+
+Dado um aluno que marcou que não iria, mas por algum motivo vai usar o serviço da van ele precisa informar que está na van e com isso deve mudar seu status para presente e a rota deve adicionar o seu ponto de embarque ou desembarque.
+
+### Requisito funcional 9
+
+Dado um motorista que tem mais passageiros que vagas, mas ela raramente é lotada, quando ela for lotar ele deve tomar a decisão de solicitar um segundo veiculo, esse veiculo deve estar atrelado a ele ou ele deve informar que foi chamado um carro de aplicativo (Uber / 99)
+
+Ou outro caso para esse problema seria, caso ele tenha dois veículos na mesma linha e as confirmações de presença no dia sejam um numero que apenas um veiculo de conta ele pode cancelar a segunda van e passar todos os passageiros para um van nesse dia especifico e a rota deve ser moldada com todos os passageiros presentes.
+
+### Requisito funcional 10/11
+
+Dada uma demanda existente uma empresa ela se cadastra como um passageiro, abre uma solicitação de linha, para seus funcionários
+
+Informando destino (empresa), horário de chegada e de saída, número de passageiros
+
+Caso um Motorista se interesse ele vai abrir um chat com o o responsável pelo anuncio e com isso negociar valores e horários, caso o motorista vai criar a linha com base nos dados do anuncio
+
+### Requisito funcional 12/27
+
+Dado um passageiro interessado em um evento em um dia especifico ele deve poder pesquisar se tem algum anuncio de transporte para esse evento
+
+Caso não tenha ele pode criar essa demanda, cadastrando o dia, local horário de inicio e termino e cidade de partida e também pode informar quantos amigos já estão dispostos a ir
+
+Outro passageiros podem também demostrar interesse na mesma linha
+
+ex: cadastrei um jogo do Corinthians e mais 5 amigos queremos ir ao jogo, crio o anuncio jogo Corinthians 6 pessoas domingo dia xx/xx/xxxx começa as 16horas e horário de Caçapava-sp
+
+Outros passageiros interessados podem se adicionar a esse evento e com isso o numero de passageiros vai subindo
+
+O motorista pode ver esse anuncio de demanda e negociar seu valor
+
+### Requisito funcional 13
+
+Dado a necessidade de negociar valores e pontos de embarque e desembarque temos a necessidade de um chat para comunicação
+
+ele deve usar firebase e deve instantâneo e gerar notificações
+
+Marcar visualizações
+
+e cada linha deve ter um chat dela com todos os membros da linha, para informar sobre atrasos e peculiaridades do dia-a-dia
+
+### Requisito funcional 14
+
+Todo veiculo e motorista deve poder ser avaliada pelos passageiros
+
+Veículos: conforto, qualidade do veiculo, manutenção e higiene
+
+Motorista: Pontualidade, direção, o quão simpatico é
+
+### Requisito funcional 15/30
+
+dado um motorista dono da van ele deve poder ter acesso aos dados das suas van e linhas
+
+Um dashboard onde pode ver numero de alunos, numero de vans, numero de linhas, estimativa de quilômetros rodados, eventos esporádicos e estimativa de ganho.
+
+Ele deve poder filtrar data, van e linha
+
+### Requisito funcional 16
+
+Como descrito em vários critérios de aceitação a notificação vai ser parte fundamental do APP
+
+Com isso preciso que cada usuário seja notificado de acordo com as necessidade e funcionalidades do APP
+
+### Requisito funcional 17
+
+Contemplado em outros requisitos, o dono das vans pode gerenciar todas as suas vans, podendo até operar como uma empresa de transportes que possui varias vans e motoristas
+
+### Requisito funcional 18
+
+Dado que o motorista vai ter que gerar pontos de embarque desembarque eles devem estar marcados em um mapa usando a API da google, para fácil visualização e uso no dia-a-dia
+
+### Requisito funcional 19/20
+
+dado que passageiros podem ter rotinas variadas ele pode ter mais de um ponto de embarque e desembarque, pra mais conforto ele deve poder definir sua rotina de forma maleável, segunda embarco no ponto A as 8 e na quinta embarco no ponto B as 7 sempre tendo que ser aprovado o ponto de embarque pelo dono da linha, isso deve ser decidido entre os dois antes do contrato ser finalizado.
+
+Usuário sugere um novo ponto o dono aprova e com isso ele pode começar a usar ele quando quiser
+
+### Requisito funcional 21
+
+Garantir que tudo o que seja feito offline seja mandado pra o banco quando a conexão for estabelecida
+
+### Requisito funcional 22
+
+dado uma linha e os pontos definidos deve gerar a distancia e tempo total, para facilitar o gerenciamento do dono da linha
+
+### Requisito funcional 23
+
+O APP deve ter um sistema de logs para informar problemas e criar soluções, salvando data hora minuto segundo e geolocalização
+
+Motorista:
+
+Transito lento
+
+Passageiro Atrasado
+
+o motorista também deve poder marcar caso um passageiro confirmado não apareça
+
+### Requisito funcional 24
+
+Para cada passageiro o motorista deve colocar o valor da mensalidade ou da corrida em eventos esporádicos e confirmar quem pagou, o APP não vai ter meio de pagamento incluso, porem isso serve para o motorista ter controle do caixa e do fluxo de dinheiro
+
+o APP não vai ter pagamento integrado
+
+### Requisito funcional 25
+
+Dado um aluno não informou atraso e não apareceu mesmo confirmado o motorista deve gerar um log desse evento, com horário e geolocalização para informar depois caso de algum problema
+
+### Requisito funcional 26
+
+Dado o aluno com uma ou mais linhas ele deve ter um dash board para ver suas próximas viagens, poder avisar faltas futuras, ver seus pagamentos estão em dia e histórico de viagens
+
+### Requisito funcional 28
+
+Integrar o a exportação de confirmações de viagens para o Google calender
+
+### Requisito funcional 29
+
+no chat da linha o motorista deve poder criar enquetes
+
+### Dores
+
+#### Dor 1
+
+Todos os dias os motoristas lidam com pessoas que não vão ou não voltam ou os dois e normalmente essa comunicação acaba ficando centralizada no WhatsApp o que acaba gerando problemas de comunicação. Fazendo com que o o motorista faça rotas desnecessárias, espere passageiro que nem foram ou no caso mais critico esqueça alguém para trás.
+
+#### Solução 1
+
+O APP vai assumir que o passageiro sempre irá, mas para suprir essa dor o APP vai ter um botão para o passageiro avisar os dias de ausência, o passageiro terá como informar as opções de:
+
+- Não vou e nem volto
+- Não vou, mas volto
+- Vou, mas não volto
+
+Sempre podendo alterar isso até o horário da partida.
+
+Para épocas atípicas como, férias ou atestado (períodos onde o passageiro sabe que vai ficar ausente), ele vai poder selecionar um período de ausência, mas caso tenha que ir em algum dia especifico ele poderá informar.
+
+Para o motorista só vai aparecer a rota e a lista de alunos que deveriam estar na van, para ele não ter que ficar puxando de memória e minimizando o risco de esquecer alguém.
+
+#### Dor 2
+
+Alguns motoristas tem mais de uma van, onde as outras vans ficam com motoristas contratados, porem tem dias que muitos aluno faltam e com isso uma van daria conta do serviço, mas como não tem o controle fácil fica difícil dele tomar essa decisão, com isso ele gasta combustível e tempo de forma desnecessária com isso
+
+#### Solução 2
+
+Ele poderá ver o numero de passageiros confirmados e com isso decidir se mantém as duas vans ou envia apenas uma para fazer a rota.
+
+#### Dor 3
+
+Uma universidade/empresa pode ter 2 horários de entrada (ex: 7:10 e 8:00) e 2 de saída (ex: 10:55 e 12:35) com isso o motorista pode fazer dois horários da mesma linha, maximizando seu lucro, porem gerenciar a lotação por horário é muito complicado, pois em uma faculdade podem ter dias em que um aluno sai mais cedo ou entra mais tarde ou vise e versa podendo dar uma super lotação na van.
+
+#### Solução 3
+
+Solução o Passageiro registra seu horário de aula no sistema:
+
+Segunda: 7:10 às 12:35
+terça: 7:10 às 12:35
+quarta: 7:10 às 10:55
+Quinta: 7:10 às 10:55
+Sexta: 7:10 às 12:35
+
+Porem em uma sexta o passageiro precise sair as 10:55 e em uma terça o passageiro não vá ter a primeira aula podendo entrar as 8:00, a prioridade da vaga é para quem registrou esse horário, porem caso tenha lugar na van nesse horário o passageiro pode voltar ou ir em outro horário em um dia especifico, caso não tenha ele fica em uma lista de espera.
+
+#### Dor 4
+
+Tempo parado e lugares vazios na van, para o motorista são perdas de dinheiro, nesse exemplo a cima onde a ultima entrega da manhã acaba as 8 e o primeiro retorno é as 10:55, ele fica quase 3 horas parado e ele pode ter 15 vagas na van e só 10 passageiros.
+
+#### Solução 4
+
+A solução é criar um canal de vendas.
+
+O motorista pode divulgar suas linhas fixas faculdades/empresas para encher todas as vagas, poder divulgar eventos esporádicos que faça (jogos de futebol, shows, eventos ...) e ainda pode ver carências de linhas na sua região (das 8:00 as 10:55 que ele fica sem rodar ele pode procurar se alguma empresa está procurando esse serviço no horário que ele está disponível, com isso aumentando seu faturamento)
+
+O motorista pode abrir uma linha única para um evento especial, exemplo (jogo do Corinthians na arena Corinthians domingo as 16, saída de Caçapava as 13hrs, adiciona o numero de vagas e valor)
+
+Empresas podem solicitar linhas, uma empresa cria um cadastro Passageiros, ela solicita linha como um passageiros solicitaria, depois do negocio fechado cada funcionário da empresa se cadastra como um passageiro e é adicionado na linha
+
+Exemplo: Empresa A tem um turno que começa as 9:30 e precisa de uma van para trazer seus funcionários, ela divulga isso no marketplace com horário de chegada e horário, número de passageiros e dias da semana.
+Com isso o motorista pode pegar essa oportunidade se fizer sentido para ele e o horário bater.
+
+Passageiros
+
+Passageiros podem buscar linhas para seu destino. exemplo (Vou iniciar meus estudos na Fatec-SJC e preciso de uma van que faça a linha Caçapava -> Fatec-sjc período da manhã e lá vão aparecer os motoristas que fazem essa rota e com isso eu posso entrar em contato e negociar com o motorista)
+
+Passageiros podem solicitar viagens únicas, exemplo (vai ter show de Fulano em SP capital no espaço Unimed tal dia, eu e meus amigos queremos ir, posso abrir uma solicitação no marketplace com data local de partida e horário do show e quantas pessoas estão interessadas)
+
+## Fluxo de usuários
+
+Teremos dois usuários Motoristas e Passageiros
+
+### Cadastro
+
+#### Motoristas
+
+Se cadastra informando nome completo CPF, Carteira de Habilitação, ano de nascimento email e senha.
+
+Após logado para criar uma linha ele deve adicionar um veiculo van/micro ônibus/ônibus, informando ano do veiculo, modelo e capacidade.
+
+Com o veiculo adicionado ele pode criar linhas pra divulgar no marketplace e adicionar seu passageiros já existentes
+
+#### Passageiro
+
+Se cadastra informando CPF, nome, idade, email e senha.
+
+Após isso pode ser convidado para uma linha, buscar uma linha ou solicitar uma linha.
+
+### Criando uma linha e gerenciando
+
+Para o cadastro de uma linha o motorista precisa ter uma ou mais vans cadastradas e com isso define o veiculo o ponto de partida e o ponto de chegada, numero de lugares vai ser herdado do do veiculo.
+
+Ao adicionar um novo passageiro o motorista tem que adicionar ponto de embarque e desembarque desse passageiro e horário que vai passar, isso pode ser editável, pois no dia-a-dia isso vai ser sentido.
+
+Caso não seja o dono da van que vai ser o motorista ele precisa informar isso adicionando o motorista
+
+### Entrando em uma linha
+
+O motorista vai anunciar sua linha, caso o passageiro tenha interesse ele vai clicar no anuncio e abrir um chat dentro do próprio APP com o motorista, eles vão negociar os valores e ponto de embarque e desembarque, quando tudo estiver certo o motorista envia um link de convite para o passageiro que vai entrar na linha especifica
+
+Caso o passageiro tenha entrado em contato pelo motorista por outro meio (indicação, whatsApp, panfleto...) quando se acertarem o motorista envia o link para o passageiro e caso ele não tenha uma conta ele vai ser direcionado para a tela de cadastro e após o cadastro finalizado ele entra na linha.
+
+### Motoristas com mais de uma van
+
+Motoristas podem ter mais de uma van e elas podem fazer a mesma rota então ele precisa de outro motorista, com isso ele envia um link de motorista de uma linha especifica, após o cadastro ou login o motorista vira o motorista dessa linha, tendo acesso aos alunos, rota, horários e quem vai e quem volta, para poder gerenciar a linha no dia-a-dia.
+
+O dono da linha ainda vai ser o motorista dono da van e ele que vai negociar valores com os alunos e ter acesso a todas as informações da linha e vai poder editar.
+
+### Primeira tela
+
+#### Passageiro
+
+Caso ele esteja em uma linha vai aparecer a confirmação do proximo dia na frente dele, sempre priorizando resolver o problema da forma mais rápida possível e facilitando a vida dele
+
+#### Motorista
+
+Caso tenha linhas vai aparecer a proxima linha dele para ele poder iniciar ela e ver o numero de passageiros confirmados.
+
+Caso não tenha linhas e tenha uma van cadastrada a primeira tela será a de criar uma nova linha
+
+Caso não tenha um veiculo cadastrado a primeira tela será de cadastro de van
+
+##Stack
+
+1. Front-end Mobile
+
+Framework: React Native.
+
+Componentes de Interface: Devem ser utilizadas FlatLists otimizadas para garantir a performance em dispositivos limitados.
+
+Testes: Uso de ferramentas como Detox ou Jest para testes de interface.
+
+2. Back-end e Banco de Dados
+
+Banco de Dados Principal: PostgreSQL (banco de dados relacional) para garantir a integridade referencial e consultas complexas.
+
+Documentação de API: Deve ser documentada com Swagger/OpenAPI e possuir versionamento (ex: /api/v1/).
+
+Autenticação: Uso de tokens JWT (JSON Web Tokens) para gerenciamento de sessões.
+
+3. Geotecnologias e Tempo Real
+
+APIs de Mapas: Integração com Google Maps Platform ou Mapbox.
+
+Notificações e Chat: \* Firebase Cloud Messaging para notificações push.
+
+Firebase para o chat e sincronização instantânea.
+
+4. Persistência e Cache (Offline-first)
+
+Armazenamento Local: SQLite para a funcionalidade de confirmação off-line.
+
+Estratégia de Cache: Uso de Redux Persist ou MMKV para acesso rápido a listas e rotas.
+
+5. Segurança e Qualidade
+
+Criptografia: Implementação de segurança de dados conforme a LGPD.
+
+Testes Automatizados: Cobertura de fluxos críticos com testes de unidade e integração no back-end.
+
+## MVP
+
+As funcionalidades da primeira versão, vão ser:
+
+Cadastros de usuários(motoristas e Passageiros)
+Cadastro de veículos
+Cadastro de linhas (horário de chegada no destino e horário de retorno na volta, pontos de embarque e desembarque)
+Link de convite para linhas (Passageiros e motoristas)
+Avisar ausência por parte do passageiro
+Chat privado entre usuários
+Chat com todos os passageiros e motorista da linha
+Modelo do banco de dados
+Alertas de próximo ponto para passageiros 
+Alerta de lotação para o motorista
