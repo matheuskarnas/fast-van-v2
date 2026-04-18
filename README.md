@@ -48,12 +48,14 @@ npm start                   # Iniciar servidor
 ```
 
 **Serviços Implementados:**
+
 - ✅ `authService.js` - Cadastro de usuários (RF1)
 - ✅ `userService.js` - Operações no banco de dados
 - ✅ `validators.js` - Validações (CPF, Email, Senha, CNH, Idade)
 - ✅ Testes Jest para RF1
 
 **Próximos passos:**
+
 - [ ] Implementar banco de dados PostgreSQL
 - [ ] Criar endpoints REST
 - [ ] Implementar Firebase para chat
@@ -71,6 +73,7 @@ npm run web                 # Rodar na Web
 ```
 
 **Estrutura:**
+
 - ✅ Navegação com Expo Router
 - ✅ Autenticação (Login/Register)
 - ✅ Bottom Tab Navigation para Passageiros e Motoristas
@@ -78,6 +81,7 @@ npm run web                 # Rodar na Web
 - ✅ Serviços de API e Storage
 
 **Próximos passos:**
+
 - [ ] Telas de Login/Register
 - [ ] Integração com backend
 - [ ] Chat em tempo real
@@ -86,20 +90,21 @@ npm run web                 # Rodar na Web
 
 ## 📋 Funcionalidades (MVP)
 
-| RF | Nome | Status | Prioridade |
-|----|------|--------|-----------|
-| 1 | Cadastro de Usuários | ✅ Backend | Alta |
-| 2 | Cadastro de Veículos | ⏳ Planejamento | Alta |
-| 3 | Criação de Linhas | ⏳ Planejamento | Alta |
-| 4 | Links de Convite | ⏳ Planejamento | Média |
-| 5 | Notificação de Ausência | ⏳ Planejamento | Média |
-| 6 | Chat Privado 1-to-1 | ⏳ Planejamento | Média |
-| 7 | Chat Grupo + Alertas | ⏳ Planejamento | Média |
-| 8 | Off-line Sync | ⏳ Planejamento | Baixa |
+| RF  | Nome                    | Status          | Prioridade |
+| --- | ----------------------- | --------------- | ---------- |
+| 1   | Cadastro de Usuários    | ✅ Backend      | Alta       |
+| 2   | Cadastro de Veículos    | ⏳ Planejamento | Alta       |
+| 3   | Criação de Linhas       | ⏳ Planejamento | Alta       |
+| 4   | Links de Convite        | ⏳ Planejamento | Média      |
+| 5   | Notificação de Ausência | ⏳ Planejamento | Média      |
+| 6   | Chat Privado 1-to-1     | ⏳ Planejamento | Média      |
+| 7   | Chat Grupo + Alertas    | ⏳ Planejamento | Média      |
+| 8   | Off-line Sync           | ⏳ Planejamento | Baixa      |
 
 ## 🛠️ Stack Tecnológico
 
 **Backend:**
+
 - Node.js + Express
 - PostgreSQL (banco de dados)
 - JWT (autenticação)
@@ -107,6 +112,7 @@ npm run web                 # Rodar na Web
 - Jest (testes)
 
 **Mobile:**
+
 - React Native + Expo
 - TypeScript
 - Expo Router (navegação)
@@ -131,6 +137,7 @@ npm run web                 # Rodar na Web
 ## 🤝 Pair Programming
 
 O desenvolvimento segue modelo de pair programming:
+
 - Implementação orientada por testes (TDD)
 - User valida e aprova cada funcionalidade
 - Prioridade em simplicidade e usabilidade
@@ -147,6 +154,7 @@ O desenvolvimento segue modelo de pair programming:
 Crie arquivos `.env` em cada pasta:
 
 **Backend** (`.env`):
+
 ```
 PORT=3000
 DATABASE_URL=postgresql://user:password@localhost:5432/fastvan
@@ -155,6 +163,7 @@ FIREBASE_CONFIG=...
 ```
 
 **Mobile** (`.env` ou `.env.local`):
+
 ```
 EXPO_PUBLIC_API_URL=http://localhost:3000
 EXPO_PUBLIC_ENV=development

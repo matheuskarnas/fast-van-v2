@@ -11,12 +11,14 @@ Guia rápido para iniciar o desenvolvimento do FastVan.
 ## ⚡ Setup Inicial (5 minutos)
 
 ### 1. Clonar Repositório
+
 ```bash
 git clone <seu-repo>
 cd fast-van-v2
 ```
 
 ### 2. Instalar Dependências
+
 ```bash
 # Instalar tudo (backend + mobile)
 npm run install:all
@@ -30,6 +32,7 @@ cd ..
 ### 3. Configurar Variáveis de Ambiente
 
 #### Backend
+
 ```bash
 cd backend
 cp .env.example .env
@@ -38,6 +41,7 @@ cd ..
 ```
 
 #### Mobile
+
 ```bash
 cd mobile
 cp .env.example .env
@@ -45,6 +49,7 @@ cd ..
 ```
 
 ### 4. Rodar Testes Backend (Validar Setup)
+
 ```bash
 npm run backend:test
 ```
@@ -52,11 +57,13 @@ npm run backend:test
 Se todos os testes passarem, o backend está pronto! ✅
 
 ### 5. Iniciar Mobile
+
 ```bash
 npm run mobile:start
 ```
 
 Aguarde a mensagem: "Metro Bundler ready". Depois pressione:
+
 - `a` para Android
 - `i` para iOS
 - `w` para Web
@@ -74,6 +81,7 @@ fast-van-v2/
 ## 🎯 Tarefas Comuns
 
 ### Rodar Testes Backend
+
 ```bash
 npm run backend:test        # Todos os testes
 npm run backend:test:rf1    # Apenas RF1
@@ -82,12 +90,14 @@ npm test:coverage           # Com coverage
 ```
 
 ### Desenvolver Backend
+
 ```bash
 npm run backend:dev         # Com auto-reload
 npm run backend:start       # Produção
 ```
 
 ### Desenvolver Mobile
+
 ```bash
 npm run mobile:start        # Expo dev server
 npm run mobile:android      # Build Android
@@ -97,14 +107,14 @@ npm run mobile:web          # Build Web
 
 ## 📁 Arquivos Importantes
 
-| Arquivo | Descrição |
-|---------|-----------|
-| `README.md` | 📖 Guia principal do projeto |
-| `ESTRUTURA.md` | 📊 Estrutura detalhada |
-| `backend/README.md` | 📱 Documentação backend |
-| `mobile/README_ESTRUTURA.md` | 📱 Documentação mobile |
-| `docs/RF1-criterios-aceite.md` | ✅ Testes RF1 |
-| `.copilotcustominstructions` | 🤖 Instruções Copilot |
+| Arquivo                        | Descrição                    |
+| ------------------------------ | ---------------------------- |
+| `README.md`                    | 📖 Guia principal do projeto |
+| `ESTRUTURA.md`                 | 📊 Estrutura detalhada       |
+| `backend/README.md`            | 📱 Documentação backend      |
+| `mobile/README_ESTRUTURA.md`   | 📱 Documentação mobile       |
+| `docs/RF1-criterios-aceite.md` | ✅ Testes RF1                |
+| `.copilotcustominstructions`   | 🤖 Instruções Copilot        |
 
 ## ✅ Checklist de Setup
 
@@ -119,6 +129,7 @@ npm run mobile:web          # Build Web
 ## 🐛 Troubleshooting
 
 ### ❌ `npm: command not found`
+
 ```bash
 # Instale Node.js: https://nodejs.org/
 # Depois verifique:
@@ -127,6 +138,7 @@ npm -v
 ```
 
 ### ❌ Testes falhando
+
 ```bash
 # Limpe cache e reinstale
 rm -rf backend/node_modules package-lock.json
@@ -135,6 +147,7 @@ npm run backend:test
 ```
 
 ### ❌ Expo não inicia
+
 ```bash
 # Instale Expo CLI globalmente
 npm install -g expo-cli
@@ -144,6 +157,7 @@ npm run mobile:start
 ```
 
 ### ❌ Porta 8081 em uso (Expo)
+
 ```bash
 # Use outra porta
 npx expo start --port 8082
@@ -162,6 +176,7 @@ npx expo start --port 8082
    - Mobile: `mobile/app/` (rotas) e `mobile/components/`
 
 3. **Rode os testes:**
+
    ```bash
    npm run backend:test
    ```
@@ -175,6 +190,7 @@ npx expo start --port 8082
 ## 🤝 Workflow de Desenvolvimento
 
 1. **Crie uma branch:**
+
    ```bash
    git checkout -b feat/RF2-cadastro-veiculo
    ```
@@ -182,11 +198,13 @@ npx expo start --port 8082
 2. **Faça as mudanças**
 
 3. **Rode testes:**
+
    ```bash
    npm run backend:test
    ```
 
 4. **Commit e push:**
+
    ```bash
    git add .
    git commit -m "feat(RF2): cadastro de veículos"
@@ -197,17 +215,17 @@ npx expo start --port 8082
 
 ## 📊 Stack Rápido
 
-| Tecnologia | Uso | Versão |
-|------------|-----|--------|
-| Node.js | Backend runtime | 18+ |
-| Express | Web framework | 4.18 |
-| React Native | Mobile app | 0.81 |
-| Expo | Mobile tooling | 54.0 |
-| TypeScript | Type safety | 5.9 |
-| Jest | Testing | 29.7 |
-| Axios | HTTP client | 1.6 |
-| PostgreSQL | Database | (próximo) |
-| Firebase | Chat/Notifs | (próximo) |
+| Tecnologia   | Uso             | Versão    |
+| ------------ | --------------- | --------- |
+| Node.js      | Backend runtime | 18+       |
+| Express      | Web framework   | 4.18      |
+| React Native | Mobile app      | 0.81      |
+| Expo         | Mobile tooling  | 54.0      |
+| TypeScript   | Type safety     | 5.9       |
+| Jest         | Testing         | 29.7      |
+| Axios        | HTTP client     | 1.6       |
+| PostgreSQL   | Database        | (próximo) |
+| Firebase     | Chat/Notifs     | (próximo) |
 
 ## 🆘 Precisa de Ajuda?
 

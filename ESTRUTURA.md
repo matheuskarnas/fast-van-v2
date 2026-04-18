@@ -93,6 +93,7 @@ fast-van-v2/ (monorepo)
 ## 🎯 Mapeamento de Funcionalidades
 
 ### Backend (Node.js/Express)
+
 ```
 RF1: Cadastro de Usuários
 ├── POST /auth/register          → authService.createUser()
@@ -107,6 +108,7 @@ RF1: Cadastro de Usuários
 ```
 
 ### Mobile (React Native/Expo)
+
 ```
 Autenticação
 ├── (auth)/login       → Tela de login
@@ -138,6 +140,7 @@ Compartilhado
 ## 📊 Status de Implementação
 
 ### ✅ Concluído
+
 - Backend: authService.js com 40+ validações
 - Backend: Testes Jest completos (RF1)
 - Backend: Validators utilities
@@ -148,11 +151,13 @@ Compartilhado
 - Documentação: Critérios de aceite (RF1)
 
 ### ⏳ Em Progresso
+
 - Backend: Banco de dados PostgreSQL
 - Backend: Endpoints REST
 - Mobile: Telas de Login/Register
 
 ### 📋 Próximos
+
 - RF2: Cadastro de Veículos
 - RF3: Criação de Linhas
 - Firebase: Chat em tempo real
@@ -163,11 +168,13 @@ Compartilhado
 ## 🚀 Como Usar
 
 ### Instalar tudo
+
 ```bash
 npm run install:all
 ```
 
 ### Backend
+
 ```bash
 npm run backend:test         # Rodar testes
 npm run backend:test:rf1     # Apenas RF1
@@ -175,12 +182,14 @@ npm run backend:dev          # Servidor em desenvolvimento
 ```
 
 ### Mobile
+
 ```bash
 npm run mobile:start         # Iniciar Expo
 npm run mobile:android       # Build Android
 ```
 
 ### Verificar Status
+
 ```bash
 npm run test:coverage        # Coverage do backend
 ```
@@ -188,18 +197,21 @@ npm run test:coverage        # Coverage do backend
 ## 📝 Convenções
 
 ### Backend
+
 - Arquivos: `camelCase.js`
 - Funções: `camelCase()`
 - Constantes: `UPPER_SNAKE_CASE`
 - Pastas: `lowercase`
 
 ### Mobile
+
 - Componentes: `PascalCase.tsx`
 - Hooks: `useHookName.ts`
 - Tipos: `interface PascalCase`
 - Rotas: `lowercase-with-dashes`
 
 ### Git
+
 ```
 feat(RF1): adiciona cadastro de usuários
 fix(auth): corrige validação de CPF

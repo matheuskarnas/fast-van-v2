@@ -22,7 +22,8 @@ backend/
 ## ✅ Implementado
 
 ### Services
-- **authService.js**: 
+
+- **authService.js**:
   - ✅ `createUser()` - Cadastro com validação completa
   - ✅ `authenticateUser()` - Login com JWT
   - ✅ `verifyToken()` - Validação de tokens
@@ -37,6 +38,7 @@ backend/
   - ✅ Mock database para testes
 
 ### Validadores (validators.js)
+
 - ✅ `validateCPF()` - CPF brasileiro (dígitos verificadores)
 - ✅ `validateEmail()` - Formato de email
 - ✅ `validatePassword()` - Força de senha (6+ chars, maiús, minús, número, especial)
@@ -46,6 +48,7 @@ backend/
 - ✅ `isEmpty()` - Verifica campos vazios
 
 ### Testes (Jest)
+
 - ✅ 40+ test cases para RF1
 - ✅ Validação de CPF (6 testes)
 - ✅ Validação de Email (4 testes)
@@ -59,11 +62,13 @@ backend/
 ## 🚀 Como Usar
 
 ### Instalação
+
 ```bash
 npm install
 ```
 
 ### Testes
+
 ```bash
 # Rodar todos os testes
 npm test
@@ -79,6 +84,7 @@ npm run test:rf1
 ```
 
 ### Desenvolvimento
+
 ```bash
 # Servidor em desenvolvimento (com auto-reload)
 npm run dev
@@ -115,34 +121,37 @@ npm start
 ### Códigos de Erro
 
 ```javascript
-INVALID_CPF                 // CPF não passa na validação
-CPF_ALREADY_EXISTS          // CPF já cadastrado
-INVALID_EMAIL               // Email em formato inválido
-EMAIL_ALREADY_EXISTS        // Email já cadastrado
-WEAK_PASSWORD              // Senha não cumpre requisitos
-INVALID_CNH                // CNH inválida
-CNH_ALREADY_EXISTS         // CNH já cadastrada
-INVALID_BIRTH_YEAR         // Ano de nascimento inválido
-INVALID_AGE                // Idade não cumpre requisitos (18+)
-MISSING_REQUIRED_FIELD     // Campo obrigatório vazio
-UNAUTHENTICATED            // Não autenticado
+INVALID_CPF; // CPF não passa na validação
+CPF_ALREADY_EXISTS; // CPF já cadastrado
+INVALID_EMAIL; // Email em formato inválido
+EMAIL_ALREADY_EXISTS; // Email já cadastrado
+WEAK_PASSWORD; // Senha não cumpre requisitos
+INVALID_CNH; // CNH inválida
+CNH_ALREADY_EXISTS; // CNH já cadastrada
+INVALID_BIRTH_YEAR; // Ano de nascimento inválido
+INVALID_AGE; // Idade não cumpre requisitos (18+)
+MISSING_REQUIRED_FIELD; // Campo obrigatório vazio
+UNAUTHENTICATED; // Não autenticado
 ```
 
 ## 📋 Validação de Senhas
 
 Requisitos (todos obrigatórios):
+
 - Mínimo **6 caracteres**
 - Pelo menos **1 letra maiúscula** (A-Z)
 - Pelo menos **1 letra minúscula** (a-z)
 - Pelo menos **1 número** (0-9)
-- Pelo menos **1 caractere especial** (!@#$%^&*)
+- Pelo menos **1 caractere especial** (!@#$%^&\*)
 
 **Exemplos válidos:**
+
 - `SenhaValida123!`
 - `Test@1234`
 - `MyPass#2024`
 
 **Exemplos inválidos:**
+
 - `123456` (sem letras ou especiais)
 - `Senha123` (sem especial)
 - `senha#@!` (sem maiúscula ou número)
@@ -150,6 +159,7 @@ Requisitos (todos obrigatórios):
 ## 🗄️ Estrutura de Dados
 
 ### User (Base)
+
 ```javascript
 {
   id: string,
@@ -164,6 +174,7 @@ Requisitos (todos obrigatórios):
 ```
 
 ### Driver (estende User)
+
 ```javascript
 {
   ...user,
@@ -174,6 +185,7 @@ Requisitos (todos obrigatórios):
 ```
 
 ### Passenger (estende User)
+
 ```javascript
 {
   ...user,
@@ -184,6 +196,7 @@ Requisitos (todos obrigatórios):
 ## 🔄 Padrão de Resposta
 
 ### Sucesso
+
 ```javascript
 {
   success: true,
@@ -199,6 +212,7 @@ Requisitos (todos obrigatórios):
 ```
 
 ### Erro
+
 ```javascript
 {
   success: false,
@@ -214,11 +228,11 @@ Requisitos (todos obrigatórios):
 
 ```json
 {
-  "bcryptjs": "^2.4.3",      // Hash de senhas
-  "jsonwebtoken": "^9.1.0",  // JWT tokens
-  "express": "^4.18.2",      // Framework web
-  "pg": "^8.11.2",           // PostgreSQL client (próximo)
-  "dotenv": "^16.3.1"        // Variáveis de ambiente
+  "bcryptjs": "^2.4.3", // Hash de senhas
+  "jsonwebtoken": "^9.1.0", // JWT tokens
+  "express": "^4.18.2", // Framework web
+  "pg": "^8.11.2", // PostgreSQL client (próximo)
+  "dotenv": "^16.3.1" // Variáveis de ambiente
 }
 ```
 
@@ -238,21 +252,21 @@ Requisitos (todos obrigatórios):
 ## 🧪 Exemplo de Teste
 
 ```javascript
-describe('RF1 - Cadastro de Usuários', () => {
-  test('deve cadastrar um passageiro com sucesso', async () => {
+describe("RF1 - Cadastro de Usuários", () => {
+  test("deve cadastrar um passageiro com sucesso", async () => {
     const response = await createUser({
-      name: 'João Silva',
-      cpf: '123.456.789-10',
-      email: 'joao@example.com',
-      password: 'ValidPass123!',
-      role: 'PASSENGER',
-      age: 25
+      name: "João Silva",
+      cpf: "123.456.789-10",
+      email: "joao@example.com",
+      password: "ValidPass123!",
+      role: "PASSENGER",
+      age: 25,
     });
 
     expect(response.success).toBe(true);
-    expect(response.user.role).toBe('PASSENGER');
+    expect(response.user.role).toBe("PASSENGER");
     expect(response.token).toBeDefined();
-    expect(response.redirectTo).toBe('/passenger/home');
+    expect(response.redirectTo).toBe("/passenger/home");
   });
 });
 ```
@@ -282,6 +296,7 @@ R: Token gerado com `jwt.sign()`, válido por 7 dias, inclui `id`, `email` e `ro
 ## 📞 Suporte
 
 Consulte:
+
 - `/docs/RF1-criterios-aceite.md` - Critérios de teste
 - `__tests__/RF1-cadastro-usuarios.test.js` - Exemplos de teste
 - `.copilotcustominstructions` - Instruções do projeto
