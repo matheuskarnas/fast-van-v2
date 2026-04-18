@@ -9,10 +9,10 @@
  * @returns {boolean}
  */
 function validateCPF(cpf) {
-  if (!cpf || typeof cpf !== 'string') return false;
+  if (!cpf || typeof cpf !== "string") return false;
 
   // Remove máscara
-  const cleanCPF = cpf.replace(/[^\d]/g, '');
+  const cleanCPF = cpf.replace(/[^\d]/g, "");
 
   // Verifica se tem 11 dígitos
   if (cleanCPF.length !== 11) return false;
@@ -37,10 +37,7 @@ function validateCPF(cpf) {
   const digit2 = remainder < 2 ? 0 : 11 - remainder;
 
   // Verifica se os dígitos verificadores estão corretos
-  return (
-    parseInt(cleanCPF[9]) === digit1 &&
-    parseInt(cleanCPF[10]) === digit2
-  );
+  return parseInt(cleanCPF[9]) === digit1 && parseInt(cleanCPF[10]) === digit2;
 }
 
 /**
@@ -49,7 +46,7 @@ function validateCPF(cpf) {
  * @returns {boolean}
  */
 function validateEmail(email) {
-  if (!email || typeof email !== 'string') return false;
+  if (!email || typeof email !== "string") return false;
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
@@ -67,10 +64,11 @@ function validateEmail(email) {
  * @returns {boolean}
  */
 function validatePassword(password) {
-  if (!password || typeof password !== 'string') return false;
+  if (!password || typeof password !== "string") return false;
 
   // Regex: pelo menos 1 maiúscula, 1 minúscula, 1 número, 1 especial, mínimo 6 caracteres
-  const passwordRegex = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{6,}$/;
+  const passwordRegex =
+    /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{6,}$/;
 
   return passwordRegex.test(password);
 }
@@ -82,7 +80,7 @@ function validatePassword(password) {
  * @returns {boolean}
  */
 function validateCNH(cnh, options = {}) {
-  if (!cnh || typeof cnh !== 'string') return false;
+  if (!cnh || typeof cnh !== "string") return false;
 
   const { validateInProduction = false } = options;
 
@@ -110,8 +108,8 @@ function isEmpty(value) {
   return (
     value === null ||
     value === undefined ||
-    value === '' ||
-    (typeof value === 'string' && value.trim() === '')
+    value === "" ||
+    (typeof value === "string" && value.trim() === "")
   );
 }
 
@@ -122,7 +120,7 @@ function isEmpty(value) {
  * @returns {boolean}
  */
 function validateAge(age, minAge = 18) {
-  return typeof age === 'number' && age >= minAge && age <= 150;
+  return typeof age === "number" && age >= minAge && age <= 150;
 }
 
 /**
@@ -143,5 +141,5 @@ module.exports = {
   validateCNH,
   isEmpty,
   validateAge,
-  validateBirthYear
+  validateBirthYear,
 };

@@ -3,8 +3,8 @@
  * Serviço responsável por validação e criação de usuários
  */
 
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const {
   validateCPF,
   validateEmail,
@@ -12,11 +12,17 @@ const {
   validateCNH,
   isEmpty,
   validateAge,
-  validateBirthYear
-} = require('../utils/validators');
-const { getUserByEmail, getUserByCPF, getUserByCNH, createUserInDB } = require('./userService');
+  validateBirthYear,
+} = require("../utils/validators");
+const {
+  getUserByEmail,
+  getUserByCPF,
+  getUserByCNH,
+  createUserInDB,
+} = require("./userService");
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET =
+  process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
 /**
  * Cria um novo usuário (Passageiro ou Motorista)
@@ -34,10 +40,10 @@ async function createUser(userData) {
       return {
         success: false,
         error: {
-          code: 'INVALID_CPF',
-          field: 'cpf',
-          message: 'CPF inválido'
-        }
+          code: "INVALID_CPF",
+          field: "cpf",
+          message: "CPF inválido",
+        },
       };
     }
 
@@ -46,10 +52,10 @@ async function createUser(userData) {
       return {
         success: false,
         error: {
-          code: 'INVALID_EMAIL',
-          field: 'email',
-          message: 'Email em formato inválido'
-        }
+          code: "INVALID_EMAIL",
+          field: "email",
+          message: "Email em formato inválido",
+        },
       };
     }
 
@@ -58,10 +64,11 @@ async function createUser(userData) {
       return {
         success: false,
         error: {
-          code: 'WEAK_PASSWORD',
-          field: 'password',
-          message: 'Senha deve ter no mínimo 6 caracteres, 1 número, 1 maiúscula, 1 minúscula e 1 caractere especial'
-        }
+          code: "WEAK_PASSWORD",
+          field: "password",
+          message:
+            "Senha deve ter no mínimo 6 caracteres, 1 número, 1 maiúscula, 1 minúscula e 1 caractere especial",
+        },
       };
     }
 
@@ -71,10 +78,10 @@ async function createUser(userData) {
       return {
         success: false,
         error: {
-          code: 'CPF_ALREADY_EXISTS',
-          field: 'cpf',
-          message: 'CPF já cadastrado no sistema'
-        }
+          code: "CPF_ALREADY_EXISTS",
+          field: "cpf",
+          message: "CPF já cadastrado no sistema",
+        },
       };
     }
 
@@ -84,24 +91,24 @@ async function createUser(userData) {
       return {
         success: false,
         error: {
-          code: 'EMAIL_ALREADY_EXISTS',
-          field: 'email',
-          message: 'Email já cadastrado no sistema'
-        }
+          code: "EMAIL_ALREADY_EXISTS",
+          field: "email",
+          message: "Email já cadastrado no sistema",
+        },
       };
     }
 
     // Validações específicas por role
-    if (userData.role === 'DRIVER') {
+    if (userData.role === "DRIVER") {
       // Validação de CNH
       if (!validateCNH(userData.cnh, { validateInProduction: false })) {
         return {
           success: false,
           error: {
-            code: 'INVALID_CNH',
-            field: 'cnh',
-            message: 'CNH inválida'
-          }
+            code: "INVALID_CNH",
+            field: "cnh",
+            message: "CNH inválida",
+          },
         };
       }
 
@@ -111,10 +118,10 @@ async function createUser(userData) {
         return {
           success: false,
           error: {
-            code: 'CNH_ALREADY_EXISTS',
-            field: 'cnh',
-            message: 'CNH já cadastrada no sistema'
-          }
+            code: "CNH_ALREADY_EXISTS",
+            field: "cnh",
+            message: "CNH já cadastrada no sistema",
+          },
         };
       }
 
@@ -123,22 +130,22 @@ async function createUser(userData) {
         return {
           success: false,
           error: {
-            code: 'INVALID_BIRTH_YEAR',
-            field: 'birthYear',
-            message: 'Ano de nascimento inválido'
-          }
+            code: "INVALID_BIRTH_YEAR",
+            field: "birthYear",
+            message: "Ano de nascimento inválido",
+          },
         };
       }
-    } else if (userData.role === 'PASSENGER') {
+    } else if (userData.role === "PASSENGER") {
       // Validação de idade
       if (!validateAge(userData.age)) {
         return {
           success: false,
           error: {
-            code: 'INVALID_AGE',
-            field: 'age',
-            message: 'Idade deve estar entre 18 e 150 anos'
-          }
+            code: "INVALID_AGE",
+            field: "age",
+            message: "Idade deve estar entre 18 e 150 anos",
+          },
         };
       }
     }
@@ -149,17 +156,17 @@ async function createUser(userData) {
     // Preparar dados para armazenar no banco
     const userToCreate = {
       name: userData.name,
-      cpf: userData.cpf.replace(/[^\d]/g, ''), // Armazena sem máscara
+      cpf: userData.cpf.replace(/[^\d]/g, ""), // Armazena sem máscara
       email: userData.email,
       password: hashedPassword,
       role: userData.role,
-      ...(userData.role === 'DRIVER' && {
+      ...(userData.role === "DRIVER" && {
         cnh: userData.cnh,
-        birthYear: userData.birthYear
+        birthYear: userData.birthYear,
       }),
-      ...(userData.role === 'PASSENGER' && {
-        age: userData.age
-      })
+      ...(userData.role === "PASSENGER" && {
+        age: userData.age,
+      }),
     };
 
     // Criar usuário no banco
@@ -169,13 +176,14 @@ async function createUser(userData) {
     const token = jwt.sign(
       { id: newUser.id, email: newUser.email, role: newUser.role },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: "7d" },
     );
 
     // Determinar redirecionamento
-    const redirectTo = userData.role === 'DRIVER'
-      ? '/driver/register-vehicle'
-      : '/passenger/home';
+    const redirectTo =
+      userData.role === "DRIVER"
+        ? "/driver/register-vehicle"
+        : "/passenger/home";
 
     return {
       success: true,
@@ -184,19 +192,19 @@ async function createUser(userData) {
         name: newUser.name,
         email: newUser.email,
         role: newUser.role,
-        ...(userData.role === 'DRIVER' && { cnh: newUser.cnh })
+        ...(userData.role === "DRIVER" && { cnh: newUser.cnh }),
       },
       token,
-      redirectTo
+      redirectTo,
     };
   } catch (error) {
-    console.error('Error creating user:', error);
+    console.error("Error creating user:", error);
     return {
       success: false,
       error: {
-        code: 'INTERNAL_ERROR',
-        message: 'Erro ao criar usuário. Tente novamente.'
-      }
+        code: "INTERNAL_ERROR",
+        message: "Erro ao criar usuário. Tente novamente.",
+      },
     };
   }
 }
@@ -207,23 +215,24 @@ async function createUser(userData) {
  * @returns {object|null} Erro se houver campos vazios, null caso contrário
  */
 function validateRequiredFields(userData) {
-  const commonRequiredFields = ['name', 'cpf', 'email', 'password', 'role'];
-  const driverRequiredFields = ['cnh', 'birthYear'];
-  const passengerRequiredFields = ['age'];
+  const commonRequiredFields = ["name", "cpf", "email", "password", "role"];
+  const driverRequiredFields = ["cnh", "birthYear"];
+  const passengerRequiredFields = ["age"];
 
-  const fieldsToCheck = userData.role === 'DRIVER'
-    ? [...commonRequiredFields, ...driverRequiredFields]
-    : [...commonRequiredFields, ...passengerRequiredFields];
+  const fieldsToCheck =
+    userData.role === "DRIVER"
+      ? [...commonRequiredFields, ...driverRequiredFields]
+      : [...commonRequiredFields, ...passengerRequiredFields];
 
   for (const field of fieldsToCheck) {
     if (isEmpty(userData[field])) {
       return {
         success: false,
         error: {
-          code: 'MISSING_REQUIRED_FIELD',
+          code: "MISSING_REQUIRED_FIELD",
           field,
-          message: 'Preencha todos os campos obrigatórios'
-        }
+          message: "Preencha todos os campos obrigatórios",
+        },
       };
     }
   }
@@ -243,9 +252,9 @@ async function authenticateUser(email, password) {
       return {
         success: false,
         error: {
-          code: 'MISSING_CREDENTIALS',
-          message: 'Email e senha são obrigatórios'
-        }
+          code: "MISSING_CREDENTIALS",
+          message: "Email e senha são obrigatórios",
+        },
       };
     }
 
@@ -254,9 +263,9 @@ async function authenticateUser(email, password) {
       return {
         success: false,
         error: {
-          code: 'INVALID_CREDENTIALS',
-          message: 'Email ou senha inválidos'
-        }
+          code: "INVALID_CREDENTIALS",
+          message: "Email ou senha inválidos",
+        },
       };
     }
 
@@ -265,16 +274,16 @@ async function authenticateUser(email, password) {
       return {
         success: false,
         error: {
-          code: 'INVALID_CREDENTIALS',
-          message: 'Email ou senha inválidos'
-        }
+          code: "INVALID_CREDENTIALS",
+          message: "Email ou senha inválidos",
+        },
       };
     }
 
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: "7d" },
     );
 
     return {
@@ -283,18 +292,18 @@ async function authenticateUser(email, password) {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
       },
-      token
+      token,
     };
   } catch (error) {
-    console.error('Error authenticating user:', error);
+    console.error("Error authenticating user:", error);
     return {
       success: false,
       error: {
-        code: 'INTERNAL_ERROR',
-        message: 'Erro ao autenticar. Tente novamente.'
-      }
+        code: "INTERNAL_ERROR",
+        message: "Erro ao autenticar. Tente novamente.",
+      },
     };
   }
 }
@@ -308,7 +317,7 @@ function verifyToken(token) {
   try {
     return jwt.verify(token, JWT_SECRET);
   } catch (error) {
-    console.error('Invalid token:', error);
+    console.error("Invalid token:", error);
     return null;
   }
 }
@@ -320,5 +329,5 @@ module.exports = {
   validateCPF,
   validateEmail,
   validatePassword,
-  validateCNH
+  validateCNH,
 };
