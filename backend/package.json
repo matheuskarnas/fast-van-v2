@@ -9,6 +9,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:rf1": "jest src/__tests__/RF1-cadastro-usuarios.test.js --verbose",
+    "db:migrate": "node src/database/runMigrations.js",
+    "db:check": "node -e \"require('dotenv').config();require('./src/config/database').testConnection().then((s)=>{console.log(s);process.exit(0);}).catch((e)=>{console.error(e);process.exit(1);})\"",
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "lint": "eslint src/",
