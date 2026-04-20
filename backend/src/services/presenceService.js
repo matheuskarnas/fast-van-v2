@@ -16,6 +16,8 @@ let mockPresenceDb = {
   attendanceByDate: {},
 };
 
+const presenceSubscribers = new Set();
+
 function isValidDateString(date) {
   if (typeof date !== "string") return false;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
@@ -29,6 +31,31 @@ function getAttendanceKey(lineId, passengerId, date) {
 
 function getLine(lineId) {
   return mockPresenceDb.lines.find((line) => line.id === lineId) || null;
+}
+
+function notifyPresenceSubscribers(event) {
+  presenceSubscribers.forEach((subscriber) => {
+    subscriber(event);
+  });
+}
+
+function subscribeToPresenceChanges(callback) {
+  presenceSubscribers.add(callback);
+  return () => {
+    presenceSubscribers.delete(callback);
+  };
+}
+
+function getAuthorizedDriverIds(line) {
+  if (Array.isArray(line.authorizedDriverIds) && line.authorizedDriverIds.length > 0) {
+    return line.authorizedDriverIds;
+  }
+
+  return [line.ownerDriverId, line.driverId].filter(Boolean);
+}
+
+function canDriverAccessLine(line, driverId) {
+  return getAuthorizedDriverIds(line).includes(driverId);
 }
 
 function getPointSegment(point) {
@@ -61,9 +88,18 @@ function isPassengerActiveInLine(line, passengerId) {
 }
 
 async function createPresenceLine(lineData) {
-  const { lineId, driverId, points = [] } = lineData || {};
+  const {
+    lineId,
+    driverId,
+    ownerDriverId,
+    capacity,
+    nextDate,
+    points = [],
+  } = lineData || {};
 
-  if (!lineId || !driverId) {
+  const resolvedOwnerDriverId = ownerDriverId || driverId;
+
+  if (!lineId || !resolvedOwnerDriverId) {
     return {
       success: false,
       error: "Dados da linha inválidos",
@@ -86,9 +122,15 @@ async function createPresenceLine(lineData) {
     passengers: Array.isArray(point.passengers) ? [...point.passengers] : [],
   }));
 
+  const authorizedDriverIds = [resolvedOwnerDriverId, driverId].filter(Boolean);
+
   mockPresenceDb.lines.push({
     id: lineId,
-    driverId,
+    ownerDriverId: resolvedOwnerDriverId,
+    driverId: driverId || null,
+    authorizedDriverIds: [...new Set(authorizedDriverIds)],
+    capacity: typeof capacity === "number" ? capacity : null,
+    nextDate: nextDate || null,
     points: normalizedPoints,
     passengerIds: [],
     passengerBoardingPointById: {},
@@ -264,6 +306,14 @@ async function markPassengerPresence(
   const key = getAttendanceKey(lineId, passengerId, date);
   mockPresenceDb.attendanceByDate[key] = status;
 
+  notifyPresenceSubscribers({
+    type: "presence-updated",
+    lineId,
+    passengerId,
+    date,
+    status,
+  });
+
   return {
     success: true,
     status,
@@ -307,7 +357,7 @@ async function getConfirmedPassengersBySegment(lineId, date, driverId) {
     };
   }
 
-  if (line.driverId !== driverId) {
+  if (!canDriverAccessLine(line, driverId)) {
     return {
       success: false,
       error: "Você não tem permissão para visualizar esta linha",
@@ -398,6 +448,28 @@ async function clearPresenceDatabase() {
     lines: [],
     attendanceByDate: {},
   };
+
+  presenceSubscribers.clear();
+}
+
+async function getPresenceLineById(lineId) {
+  const line = getLine(lineId);
+
+  if (!line) {
+    return {
+      success: false,
+      error: "Linha não encontrada",
+    };
+  }
+
+  return {
+    success: true,
+    line,
+  };
+}
+
+function getPresenceStatusForDate(lineId, passengerId, date) {
+  return getStatusForDate(lineId, passengerId, date);
 }
 
 module.exports = {
@@ -411,5 +483,8 @@ module.exports = {
   getPassengerPresenceStatus,
   getConfirmedPassengersBySegment,
   buildDailyRoute,
+  getPresenceLineById,
+  getPresenceStatusForDate,
+  subscribeToPresenceChanges,
   clearPresenceDatabase,
 };
