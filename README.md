@@ -134,6 +134,7 @@ npm run web                 # Rodar na Web
 - [RF1 - Critérios de Aceitação](./docs/RF1-criterios-aceite.md) - Detalhes de validações e cenários de teste
 - [RF2 - Critérios de Aceitação](./docs/RF2-criterios-aceite.md) - Cadastro e gerenciamento de rotas
 - [RF3 - Critérios de Aceitação](./docs/RF3-criterios-aceite.md) - Confirmação de presença do aluno
+- [RF5 - Critérios de Aceitação](./docs/RF5-criterios-aceite.md) - Alertas de lotação crítica
 - [Estrutura Mobile](./mobile/README_ESTRUTURA.md) - Organização do app mobile
 
 ## 🔄 Fluxo de Trabalho (TDD)

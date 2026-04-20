@@ -282,7 +282,7 @@ Dado linhas criadas e funcionando o motorista tem acesso a quantos então confir
 
 ### Requisito funcional 5
 
-dado uma lotação seja igual ou maior a 80% ele deve receber um alerta e caso passe de 100% ele deve receber outro alerta informando que a capacidade foi excedida.
+Critérios oficiais em: [docs/RF5-criterios-aceite.md](./docs/RF5-criterios-aceite.md)
 
 ### Requisito funcional 6
 

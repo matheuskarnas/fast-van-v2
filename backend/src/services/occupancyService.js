@@ -54,7 +54,8 @@ async function getLineOccupancy(lineId, date, driverId) {
   if (line.nextDate && line.nextDate !== date) {
     return {
       success: false,
-      error: "A consulta de ocupação só é permitida para a próxima data da linha",
+      error:
+        "A consulta de ocupação só é permitida para a próxima data da linha",
     };
   }
 
@@ -91,12 +92,18 @@ async function getLineOccupancy(lineId, date, driverId) {
     occupancy: {
       outbound: {
         confirmedCount: outboundConfirmed.length,
-        percentage: roundOccupancyPercent(outboundConfirmed.length, line.capacity),
+        percentage: roundOccupancyPercent(
+          outboundConfirmed.length,
+          line.capacity,
+        ),
         confirmedPassengerIds: outboundConfirmed,
       },
       return: {
         confirmedCount: returnConfirmed.length,
-        percentage: roundOccupancyPercent(returnConfirmed.length, line.capacity),
+        percentage: roundOccupancyPercent(
+          returnConfirmed.length,
+          line.capacity,
+        ),
         confirmedPassengerIds: returnConfirmed,
       },
     },

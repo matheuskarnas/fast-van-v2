@@ -47,7 +47,10 @@ function subscribeToPresenceChanges(callback) {
 }
 
 function getAuthorizedDriverIds(line) {
-  if (Array.isArray(line.authorizedDriverIds) && line.authorizedDriverIds.length > 0) {
+  if (
+    Array.isArray(line.authorizedDriverIds) &&
+    line.authorizedDriverIds.length > 0
+  ) {
     return line.authorizedDriverIds;
   }
 
