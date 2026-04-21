@@ -3,8 +3,6 @@
  * Responsável pela criação, atualização e gerenciamento de linhas de transporte
  */
 
-const db = require("../config/database");
-
 // Simulação de banco de dados em memória para testes
 let mockLines = [];
 let mockPointId = 0;

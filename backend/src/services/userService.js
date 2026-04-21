@@ -73,7 +73,7 @@ async function createUserInDB(userData) {
     mockDatabase.users.push(newUser);
 
     // Retornar sem a senha
-    const { password, ...userWithoutPassword } = newUser;
+    const { password: _password, ...userWithoutPassword } = newUser;
     return userWithoutPassword;
   } catch (error) {
     console.error("Error creating user in DB:", error);
@@ -271,7 +271,7 @@ async function updateUser(id, updateData) {
       updatedAt: new Date(),
     };
 
-    const { password, ...userWithoutPassword } = mockDatabase.users[userIndex];
+    const { password: _password, ...userWithoutPassword } = mockDatabase.users[userIndex];
     return userWithoutPassword;
   } catch (error) {
     console.error("Error updating user:", error);
@@ -338,7 +338,7 @@ async function getAllUsers() {
 
     return mockDatabase.users
       .filter((user) => !user.deletedAt)
-      .map(({ password, ...user }) => user);
+      .map(({ password: _password, ...user }) => user);
   } catch (error) {
     console.error("Error getting all users:", error);
     throw error;

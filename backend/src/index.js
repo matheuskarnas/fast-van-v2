@@ -63,7 +63,7 @@ app.use((req, res) => {
   });
 });
 
-app.use((error, req, res, next) => {
+app.use((error, req, res, _next) => {
   console.error("Unhandled error:", error);
   res.status(500).json({
     success: false,
