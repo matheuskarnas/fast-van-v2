@@ -1,25 +1,65 @@
-import { BottomTabNavigationProp, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View } from 'react-native';
-
-const Tab = createBottomTabNavigator();
-
-// Placeholder screens
-const HomeScreen = () => <View />;
-const LinesScreen = () => <View />;
-const ChatScreen = () => <View />;
-const ProfileScreen = () => <View />;
+import { Tabs } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { theme } from "../../../constants/theme";
 
 export default function PassengerLayout() {
   return (
-    <Tab.Navigator
+    <Tabs
       screenOptions={{
-        headerShown: true,
+        headerShown: false,
+        tabBarActiveTintColor: theme.colors.brand.orange,
+        tabBarInactiveTintColor: theme.colors.text.muted,
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: "600",
+        },
+        tabBarStyle: {
+          backgroundColor: theme.colors.background.card,
+          borderTopColor: theme.colors.border.soft,
+          borderTopWidth: 1,
+        },
       }}
     >
-      <Tab.Screen name="home" component={HomeScreen} />
-      <Tab.Screen name="lines" component={LinesScreen} />
-      <Tab.Screen name="chat" component={ChatScreen} />
-      <Tab.Screen name="profile" component={ProfileScreen} />
-    </Tab.Navigator>
+      <Tabs.Screen
+        name="home"
+        options={{
+          title: "Início",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="lines"
+        options={{
+          title: "Linhas",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="bus-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: "Chat",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              color={color}
+              size={size}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Perfil",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-outline" color={color} size={size} />
+          ),
+        }}
+      />
+    </Tabs>
   );
 }
