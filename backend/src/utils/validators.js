@@ -114,32 +114,59 @@ function isEmpty(value) {
 }
 
 /**
- * Valida idade mínima
- * @param {number} age - Idade a validar
- * @param {number} minAge - Idade mínima (padrão 18)
+ * Valida data de nascimento
+ * Aceita Date, timestamp ou string ISO.
+ * Regra: idade entre 18 e 150 anos.
+ * @param {Date|string|number} birthDate - Data de nascimento
  * @returns {boolean}
  */
-function validateAge(age, minAge = 18) {
-  return typeof age === "number" && age >= minAge && age <= 150;
-}
+function validateBirthDate(birthDate) {
+  // Valida se foi fornecida uma data
+  if (
+    !birthDate ||
+    (typeof birthDate === "string" && birthDate.trim() === "")
+  ) {
+    return false;
+  }
 
-/**
- * Valida ano de nascimento
- * @param {number} birthYear - Ano de nascimento
- * @returns {boolean}
- */
-function validateBirthYear(birthYear) {
-  const currentYear = new Date().getFullYear();
-  const age = currentYear - birthYear;
-  return age >= 18 && age <= 150 && birthYear > 1900;
-}
+  // Converte para objeto Date
+  let parsedDate;
+  if (birthDate instanceof Date) {
+    parsedDate = birthDate;
+  } else if (typeof birthDate === "string") {
+    parsedDate = new Date(birthDate);
+  } else if (typeof birthDate === "number") {
+    parsedDate = new Date(birthDate);
+  } else {
+    return false;
+  }
 
+  // Valida se a data é válida
+  if (Number.isNaN(parsedDate.getTime())) {
+    return false;
+  }
+
+  // Calcula as datas limite (18 a 150 anos atrás)
+  const now = new Date();
+  const minDate = new Date(
+    now.getFullYear() - 150,
+    now.getMonth(),
+    now.getDate(),
+  );
+  const maxDate = new Date(
+    now.getFullYear() - 18,
+    now.getMonth(),
+    now.getDate(),
+  );
+
+  // Valida se a idade está no intervalo permitido
+  return parsedDate >= minDate && parsedDate <= maxDate;
+}
 module.exports = {
   validateCPF,
   validateEmail,
   validatePassword,
   validateCNH,
   isEmpty,
-  validateAge,
-  validateBirthYear,
+  validateBirthDate,
 };

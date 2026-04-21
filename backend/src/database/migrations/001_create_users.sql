@@ -6,16 +6,12 @@ CREATE TABLE IF NOT EXISTS users (
   password TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('DRIVER', 'PASSENGER')),
   cnh TEXT,
-  birth_year INTEGER,
-  age INTEGER,
+  birth_date TIMESTAMP NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
   deleted_at TIMESTAMP,
   CONSTRAINT cnh_required_for_driver CHECK (
-    role <> 'DRIVER' OR (cnh IS NOT NULL AND birth_year IS NOT NULL)
-  ),
-  CONSTRAINT age_required_for_passenger CHECK (
-    role <> 'PASSENGER' OR age IS NOT NULL
+    role <> 'DRIVER' OR cnh IS NOT NULL
   )
 );
 

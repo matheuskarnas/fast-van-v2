@@ -224,7 +224,7 @@ async function getLinesByDriver(driverId) {
 
     if (process.env.USE_MOCK_DB === "true") {
       lines = mockLines.filter(
-        (l) => l.ownerDriverId === driverId || l.driverId === driverId
+        (l) => l.ownerDriverId === driverId || l.driverId === driverId,
       );
     }
 
@@ -238,6 +238,32 @@ async function getLinesByDriver(driverId) {
       error: `Erro ao buscar linhas: ${error.message}`,
     };
   }
+}
+
+/**
+ * Verifica se um veículo possui linha ativa vinculada.
+ * No modo mock, considera ativa qualquer linha existente para o veículo.
+ *
+ * @param {string} vehicleId - ID do veículo
+ * @param {string} [driverId] - ID do motorista para escopo opcional
+ * @returns {Promise<boolean>} true quando houver linha ativa vinculada
+ */
+async function hasActiveLineByVehicleId(vehicleId, driverId) {
+  if (!vehicleId) return false;
+
+  if (process.env.USE_MOCK_DB === "true") {
+    return mockLines.some((line) => {
+      const isSameVehicle = line.vehicleId === vehicleId;
+      if (!isSameVehicle) return false;
+
+      if (!driverId) return true;
+
+      return line.ownerDriverId === driverId || line.driverId === driverId;
+    });
+  }
+
+  // Ainda não há persistência de linhas em banco neste projeto.
+  return false;
 }
 
 /**
@@ -315,7 +341,7 @@ async function removeLine(lineId, driverId) {
       lineIndex = mockLines.findIndex(
         (l) =>
           l.id === lineId &&
-          (l.ownerDriverId === driverId || l.driverId === driverId)
+          (l.ownerDriverId === driverId || l.driverId === driverId),
       );
     }
 
@@ -354,6 +380,7 @@ module.exports = {
   addPickupDropoffPoint,
   getLineById,
   getLinesByDriver,
+  hasActiveLineByVehicleId,
   attachDriverToLine,
   removeLine,
   clearLineDatabase,

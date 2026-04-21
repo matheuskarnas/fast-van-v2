@@ -10,15 +10,17 @@ const { clearDatabase } = require("../services/userService");
 const {
   createVehicle,
   getVehiclesByDriver,
+  deleteVehicle,
   clearVehicleDatabase,
 } = require("../services/vehicleService");
+const { createLine, clearLineDatabase } = require("../services/lineService");
 
 describe("RF2: Cadastro de Veículos", () => {
   const validDriver = {
     name: "Carlos Motorista",
     cpf: "123.456.789-09",
     cnh: "12345678901",
-    birthYear: 1988,
+    birthDate: "1988-01-01T00:00:00.000Z",
     email: "carlos.driver@example.com",
     password: "Driver@123",
     role: "DRIVER",
@@ -27,7 +29,7 @@ describe("RF2: Cadastro de Veículos", () => {
   const validPassenger = {
     name: "Paula Passageira",
     cpf: "987.654.321-00",
-    age: 23,
+    birthDate: "2002-01-01T00:00:00.000Z",
     email: "paula.passenger@example.com",
     password: "Pass@123",
     role: "PASSENGER",
@@ -42,6 +44,7 @@ describe("RF2: Cadastro de Veículos", () => {
 
   beforeEach(async () => {
     await clearVehicleDatabase();
+    await clearLineDatabase();
     await clearDatabase();
   });
 
@@ -143,5 +146,64 @@ describe("RF2: Cadastro de Veículos", () => {
     expect(result.vehicles).toHaveLength(1);
     expect(result.vehicles[0].driverId).toBe(driverOne.user.id);
     expect(result.vehicles[0].plate).toBe("ABC1D23");
+  });
+
+  it("deve remover veículo quando não há linha ativa vinculada", async () => {
+    const userResult = await createUser(validDriver);
+    const vehicleResult = await createVehicle(userResult.user.id, validVehicle);
+
+    const deleteResult = await deleteVehicle(
+      userResult.user.id,
+      vehicleResult.vehicle.id,
+    );
+
+    expect(deleteResult.success).toBe(true);
+
+    const listResult = await getVehiclesByDriver(userResult.user.id);
+    expect(listResult.success).toBe(true);
+    expect(listResult.vehicles).toHaveLength(0);
+  });
+
+  it("deve bloquear remoção de veículo com linha ativa vinculada", async () => {
+    const userResult = await createUser(validDriver);
+    const vehicleResult = await createVehicle(userResult.user.id, validVehicle);
+
+    const lineResult = await createLine(
+      {
+        vehicleId: vehicleResult.vehicle.id,
+        originCity: "Caçapava",
+        destinationPlace: "Fatec-SJC",
+      },
+      userResult.user.id,
+    );
+
+    expect(lineResult.success).toBe(true);
+
+    const deleteResult = await deleteVehicle(
+      userResult.user.id,
+      vehicleResult.vehicle.id,
+    );
+
+    expect(deleteResult.success).toBe(false);
+    expect(deleteResult.error.code).toBe("VEHICLE_HAS_ACTIVE_ROUTE");
+  });
+
+  it("deve bloquear remoção de veículo de outro motorista", async () => {
+    const owner = await createUser(validDriver);
+    const otherDriver = await createUser({
+      ...validDriver,
+      email: "other.driver.delete@example.com",
+      cpf: "529.982.247-25",
+      cnh: "55443322119",
+    });
+
+    const vehicleResult = await createVehicle(owner.user.id, validVehicle);
+    const deleteResult = await deleteVehicle(
+      otherDriver.user.id,
+      vehicleResult.vehicle.id,
+    );
+
+    expect(deleteResult.success).toBe(false);
+    expect(deleteResult.error.code).toBe("FORBIDDEN_RESOURCE");
   });
 });

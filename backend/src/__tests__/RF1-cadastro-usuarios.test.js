@@ -136,7 +136,7 @@ describe("RF1: Cadastro de Usuários", () => {
     const validPassengerData = {
       name: "João Silva",
       cpf: "123.456.789-09",
-      age: 25,
+      birthDate: "2000-01-01T00:00:00.000Z",
       email: "joao@example.com",
       password: "Senha@123",
       role: "PASSENGER",
@@ -183,7 +183,7 @@ describe("RF1: Cadastro de Usuários", () => {
       name: "Maria Silva",
       cpf: "987.654.321-00",
       cnh: "9876543210",
-      birthYear: 1990,
+      birthDate: "1990-01-01T00:00:00.000Z",
       email: "maria@example.com",
       password: "Senha@456",
       role: "DRIVER",
@@ -205,7 +205,7 @@ describe("RF1: Cadastro de Usuários", () => {
     it("deve redirecionar para cadastro de veículo após cadastro de motorista", async () => {
       const result = await createUser(validDriverData);
 
-      expect(result.redirectTo).toBe("/driver/register-vehicle");
+      expect(result.redirectTo).toBe("/driver/vehicles");
     });
 
     it("deve retornar token de autenticação após cadastro bem-sucedido", async () => {
@@ -229,7 +229,7 @@ describe("RF1: Cadastro de Usuários", () => {
       const invalidData = {
         name: "João Silva",
         cpf: "000.000.000-00",
-        age: 25,
+        birthDate: "2000-01-01T00:00:00.000Z",
         email: "joao@example.com",
         password: "Senha@123",
         role: "PASSENGER",
@@ -247,7 +247,7 @@ describe("RF1: Cadastro de Usuários", () => {
       const invalidData = {
         name: "João Silva",
         cpf: "123.456.789-00",
-        age: 25,
+        birthDate: "2000-01-01T00:00:00.000Z",
         email: "joao@example.com",
         password: "Senha@123",
         role: "PASSENGER",
@@ -264,7 +264,7 @@ describe("RF1: Cadastro de Usuários", () => {
     const existingData = {
       name: "João Silva",
       cpf: "123.456.789-09",
-      age: 25,
+      birthDate: "2000-01-01T00:00:00.000Z",
       email: "joao@example.com",
       password: "Senha@123",
       role: "PASSENGER",
@@ -279,7 +279,7 @@ describe("RF1: Cadastro de Usuários", () => {
       const duplicateData = {
         name: "Maria Silva",
         cpf: "123.456.789-09",
-        age: 30,
+        birthDate: "1995-01-01T00:00:00.000Z",
         email: "maria@example.com",
         password: "Senha@456",
         role: "PASSENGER",
@@ -297,7 +297,7 @@ describe("RF1: Cadastro de Usuários", () => {
     const existingData = {
       name: "João Silva",
       cpf: "123.456.789-09",
-      age: 25,
+      birthDate: "2000-01-01T00:00:00.000Z",
       email: "joao@example.com",
       password: "Senha@123",
       role: "PASSENGER",
@@ -312,7 +312,7 @@ describe("RF1: Cadastro de Usuários", () => {
       const duplicateData = {
         name: "Maria Silva",
         cpf: "987.654.321-00",
-        age: 30,
+        birthDate: "1995-01-01T00:00:00.000Z",
         email: "joao@example.com",
         password: "Senha@456",
         role: "PASSENGER",
@@ -347,7 +347,7 @@ describe("RF1: Cadastro de Usuários", () => {
         const invalidData = {
           name: "João Silva",
           cpf: "123.456.789-09",
-          age: 25,
+          birthDate: "2000-01-01T00:00:00.000Z",
           email: "joao@example.com",
           password,
           role: "PASSENGER",
@@ -365,7 +365,7 @@ describe("RF1: Cadastro de Usuários", () => {
       const invalidData = {
         name: "João Silva",
         cpf: "123.456.789-09",
-        age: 25,
+        birthDate: "2000-01-01T00:00:00.000Z",
         email: "joao@example.com",
         password: "senha123",
         role: "PASSENGER",
@@ -398,7 +398,7 @@ describe("RF1: Cadastro de Usuários", () => {
         const invalidData = {
           name: "João Silva",
           cpf: "123.456.789-09",
-          age: 25,
+          birthDate: "2000-01-01T00:00:00.000Z",
           email,
           password: "Senha@123",
           role: "PASSENGER",
@@ -418,14 +418,14 @@ describe("RF1: Cadastro de Usuários", () => {
       await clearDatabase();
     });
 
-    const requiredFields = ["name", "cpf", "age", "email", "password"];
+    const requiredFields = ["name", "cpf", "birthDate", "email", "password"];
 
     requiredFields.forEach((field) => {
       it(`deve rejeitar cadastro com campo obrigatório vazio: ${field}`, async () => {
         const incompleteData = {
           name: "João Silva",
           cpf: "123.456.789-09",
-          age: 25,
+          birthDate: "2000-01-01T00:00:00.000Z",
           email: "joao@example.com",
           password: "Senha@123",
           role: "PASSENGER",
@@ -454,7 +454,7 @@ describe("RF1: Cadastro de Usuários", () => {
       "name",
       "cpf",
       "cnh",
-      "birthYear",
+      "birthDate",
       "email",
       "password",
     ];
@@ -465,13 +465,13 @@ describe("RF1: Cadastro de Usuários", () => {
           name: "Maria Silva",
           cpf: "987.654.321-00",
           cnh: "9876543210",
-          birthYear: 1990,
+          birthDate: "1990-01-01T00:00:00.000Z",
           email: "maria@example.com",
           password: "Senha@456",
           role: "DRIVER",
         };
 
-        incompleteData[field] = field === "birthYear" ? null : "";
+        incompleteData[field] = field === "birthDate" ? null : "";
 
         const result = await createUser(incompleteData);
 
@@ -489,7 +489,7 @@ describe("RF1: Cadastro de Usuários", () => {
       name: "Maria Silva",
       cpf: "987.654.321-00",
       cnh: "9876543210",
-      birthYear: 1990,
+      birthDate: "1990-01-01T00:00:00.000Z",
       email: "maria@example.com",
       password: "Senha@456",
       role: "DRIVER",
@@ -505,7 +505,7 @@ describe("RF1: Cadastro de Usuários", () => {
         name: "João Silva",
         cpf: "123.456.789-09",
         cnh: "9876543210",
-        birthYear: 1985,
+        birthDate: "1985-01-01T00:00:00.000Z",
         email: "joao@example.com",
         password: "Senha@123",
         role: "DRIVER",
@@ -543,7 +543,7 @@ describe("RF1: Cadastro de Usuários", () => {
       const passengerResult = await createUser({
         name: "João Passageiro",
         cpf: "123.456.789-09",
-        age: 25,
+        birthDate: "2000-01-01T00:00:00.000Z",
         email: "joao@example.com",
         password: "Senha@123",
         role: "PASSENGER",
@@ -554,7 +554,7 @@ describe("RF1: Cadastro de Usuários", () => {
         name: "Maria Motorista",
         cpf: "987.654.321-00",
         cnh: "9876543210",
-        birthYear: 1990,
+        birthDate: "1990-01-01T00:00:00.000Z",
         email: "maria@example.com",
         password: "Senha@456",
         role: "DRIVER",

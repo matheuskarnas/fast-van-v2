@@ -11,8 +11,7 @@ const {
   validatePassword,
   validateCNH,
   isEmpty,
-  validateAge,
-  validateBirthYear,
+  validateBirthDate,
 } = require("../utils/validators");
 const {
   getUserByEmail,
@@ -35,6 +34,23 @@ async function createUser(userData) {
     const validationError = validateRequiredFields(userData);
     if (validationError) return validationError;
 
+    // Debug: Log do payload recebido
+    console.log(
+      "📱 Payload recebido do mobile:",
+      JSON.stringify(
+        {
+          name: userData.name ? "✓" : "✗",
+          cpf: userData.cpf ? "✓" : "✗",
+          email: userData.email ? "✓" : "✗",
+          password: userData.password ? "✓" : "✗",
+          role: userData.role,
+          birthDate: userData.birthDate,
+          cnh: userData.cnh ? "✓" : "✗",
+        },
+        null,
+        2,
+      ),
+    );
     // Validação de CPF
     if (!validateCPF(userData.cpf)) {
       return {
@@ -98,6 +114,18 @@ async function createUser(userData) {
       };
     }
 
+    // Validação de data de nascimento (obrigatória para todos os perfis)
+    if (!validateBirthDate(userData.birthDate)) {
+      return {
+        success: false,
+        error: {
+          code: "INVALID_BIRTH_DATE",
+          field: "birthDate",
+          message: "Data de nascimento inválida",
+        },
+      };
+    }
+
     // Validações específicas por role
     if (userData.role === "DRIVER") {
       // Validação de CNH
@@ -124,30 +152,6 @@ async function createUser(userData) {
           },
         };
       }
-
-      // Validação de ano de nascimento
-      if (!validateBirthYear(userData.birthYear)) {
-        return {
-          success: false,
-          error: {
-            code: "INVALID_BIRTH_YEAR",
-            field: "birthYear",
-            message: "Ano de nascimento inválido",
-          },
-        };
-      }
-    } else if (userData.role === "PASSENGER") {
-      // Validação de idade
-      if (!validateAge(userData.age)) {
-        return {
-          success: false,
-          error: {
-            code: "INVALID_AGE",
-            field: "age",
-            message: "Idade deve estar entre 18 e 150 anos",
-          },
-        };
-      }
     }
 
     // Hash da senha
@@ -160,12 +164,9 @@ async function createUser(userData) {
       email: userData.email,
       password: hashedPassword,
       role: userData.role,
+      birthDate: userData.birthDate,
       ...(userData.role === "DRIVER" && {
         cnh: userData.cnh,
-        birthYear: userData.birthYear,
-      }),
-      ...(userData.role === "PASSENGER" && {
-        age: userData.age,
       }),
     };
 
@@ -181,9 +182,7 @@ async function createUser(userData) {
 
     // Determinar redirecionamento
     const redirectTo =
-      userData.role === "DRIVER"
-        ? "/driver/register-vehicle"
-        : "/passenger/home";
+      userData.role === "DRIVER" ? "/driver/vehicles" : "/passenger/home";
 
     return {
       success: true,
@@ -214,16 +213,18 @@ async function createUser(userData) {
  * @param {object} userData - Dados do usuário
  * @returns {object|null} Erro se houver campos vazios, null caso contrário
  */
+
 function validateRequiredFields(userData) {
   const commonRequiredFields = ["name", "cpf", "email", "password", "role"];
-  const driverRequiredFields = ["cnh", "birthYear"];
-  const passengerRequiredFields = ["age"];
+  const driverRequiredFields = ["cnh"];
+  const passengerRequiredFields = [];
 
   const fieldsToCheck =
     userData.role === "DRIVER"
       ? [...commonRequiredFields, ...driverRequiredFields]
       : [...commonRequiredFields, ...passengerRequiredFields];
 
+  // Verifica campos comuns
   for (const field of fieldsToCheck) {
     if (isEmpty(userData[field])) {
       return {
@@ -237,9 +238,20 @@ function validateRequiredFields(userData) {
     }
   }
 
+  // Valida birthDate especificamente (não apenas se está vazio)
+  if (!userData.birthDate || typeof userData.birthDate !== "string") {
+    return {
+      success: false,
+      error: {
+        code: "MISSING_REQUIRED_FIELD",
+        field: "birthDate",
+        message: "Preencha todos os campos obrigatórios",
+      },
+    };
+  }
+
   return null;
 }
-
 /**
  * Autentica um usuário existente
  * @param {string} email - Email do usuário
@@ -330,4 +342,5 @@ module.exports = {
   validateEmail,
   validatePassword,
   validateCNH,
+  validateBirthDate,
 };

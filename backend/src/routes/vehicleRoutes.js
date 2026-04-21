@@ -3,6 +3,7 @@ const { requireAuth } = require("../middlewares/authMiddleware");
 const {
   createVehicle,
   getVehiclesByDriver,
+  deleteVehicle,
 } = require("../services/vehicleService");
 
 const router = express.Router();
@@ -16,6 +17,9 @@ function mapErrorCodeToStatus(errorCode) {
     INVALID_VEHICLE_YEAR: 400,
     INVALID_VEHICLE_CAPACITY: 400,
     PLATE_ALREADY_EXISTS: 409,
+    VEHICLE_NOT_FOUND: 404,
+    FORBIDDEN_RESOURCE: 403,
+    VEHICLE_HAS_ACTIVE_ROUTE: 409,
     INTERNAL_ERROR: 500,
   };
 
@@ -39,6 +43,20 @@ router.post("/", requireAuth, async (req, res, next) => {
 router.get("/", requireAuth, async (req, res, next) => {
   try {
     const result = await getVehiclesByDriver(req.auth.id);
+
+    if (result.success) {
+      return res.status(200).json(result);
+    }
+
+    return res.status(mapErrorCodeToStatus(result.error?.code)).json(result);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.delete("/:vehicleId", requireAuth, async (req, res, next) => {
+  try {
+    const result = await deleteVehicle(req.auth.id, req.params.vehicleId);
 
     if (result.success) {
       return res.status(200).json(result);

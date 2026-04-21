@@ -1,5 +1,6 @@
 const { query, shouldUseDatabase } = require("../config/database");
 const { getUserById } = require("./userService");
+const { hasActiveLineByVehicleId } = require("./lineService");
 
 const mockVehicleDatabase = {
   vehicles: [],
@@ -72,6 +73,26 @@ async function findVehicleByPlate(plate) {
     mockVehicleDatabase.vehicles.find(
       (vehicle) => vehicle.plate === normalizedPlate,
     ) || null
+  );
+}
+
+async function findVehicleById(vehicleId) {
+  if (shouldUseDatabase()) {
+    const result = await query(
+      `
+        SELECT id, driver_id, plate, model, year, capacity, created_at, updated_at
+        FROM vehicles
+        WHERE id = $1
+      `,
+      [vehicleId],
+    );
+
+    return mapVehicleRowToDomain(result.rows[0]);
+  }
+
+  return (
+    mockVehicleDatabase.vehicles.find((vehicle) => vehicle.id === vehicleId) ||
+    null
   );
 }
 
@@ -256,6 +277,114 @@ async function getVehiclesByDriver(driverId) {
   }
 }
 
+async function deleteVehicle(driverId, vehicleId) {
+  try {
+    if (!vehicleId || String(vehicleId).trim() === "") {
+      return {
+        success: false,
+        error: {
+          code: "MISSING_REQUIRED_FIELD",
+          field: "vehicleId",
+          message: "ID do veículo é obrigatório",
+        },
+      };
+    }
+
+    const vehicle = await findVehicleById(vehicleId);
+
+    if (!vehicle) {
+      return {
+        success: false,
+        error: {
+          code: "VEHICLE_NOT_FOUND",
+          field: "vehicleId",
+          message: "Veículo não encontrado",
+        },
+      };
+    }
+
+    if (vehicle.driverId !== driverId) {
+      return {
+        success: false,
+        error: {
+          code: "FORBIDDEN_RESOURCE",
+          message: "Você não tem permissão para remover este veículo",
+        },
+      };
+    }
+
+    const hasActiveLine = await hasActiveLineByVehicleId(vehicleId, driverId);
+    if (hasActiveLine) {
+      return {
+        success: false,
+        error: {
+          code: "VEHICLE_HAS_ACTIVE_ROUTE",
+          message:
+            "Não é possível remover o veículo enquanto houver linha ativa vinculada",
+        },
+      };
+    }
+
+    if (shouldUseDatabase()) {
+      const result = await query(
+        `
+          DELETE FROM vehicles
+          WHERE id = $1 AND driver_id = $2
+          RETURNING id
+        `,
+        [vehicleId, driverId],
+      );
+
+      if (!result.rows[0]) {
+        return {
+          success: false,
+          error: {
+            code: "VEHICLE_NOT_FOUND",
+            field: "vehicleId",
+            message: "Veículo não encontrado",
+          },
+        };
+      }
+
+      return {
+        success: true,
+        message: "Veículo removido com sucesso",
+      };
+    }
+
+    const vehicleIndex = mockVehicleDatabase.vehicles.findIndex(
+      (item) => item.id === vehicleId && item.driverId === driverId,
+    );
+
+    if (vehicleIndex === -1) {
+      return {
+        success: false,
+        error: {
+          code: "VEHICLE_NOT_FOUND",
+          field: "vehicleId",
+          message: "Veículo não encontrado",
+        },
+      };
+    }
+
+    mockVehicleDatabase.vehicles.splice(vehicleIndex, 1);
+
+    return {
+      success: true,
+      message: "Veículo removido com sucesso",
+    };
+  } catch (error) {
+    console.error("Error deleting vehicle:", error);
+    return {
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Erro ao remover veículo. Tente novamente.",
+      },
+    };
+  }
+}
+
 async function clearVehicleDatabase() {
   if (shouldUseDatabase()) {
     await query("TRUNCATE TABLE vehicles");
@@ -268,6 +397,7 @@ async function clearVehicleDatabase() {
 module.exports = {
   createVehicle,
   getVehiclesByDriver,
+  deleteVehicle,
   clearVehicleDatabase,
   validateVehiclePlate,
   validateVehicleYear,

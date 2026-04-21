@@ -24,8 +24,7 @@ function mapUserRowToDomain(row) {
     password: row.password,
     role: row.role,
     cnh: row.cnh,
-    birthYear: row.birth_year,
-    age: row.age,
+    birthDate: row.birth_date,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
@@ -44,9 +43,9 @@ async function createUserInDB(userData) {
 
       const result = await query(
         `
-          INSERT INTO users (id, name, cpf, email, password, role, cnh, birth_year, age)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-          RETURNING id, name, cpf, email, role, cnh, birth_year, age, created_at, updated_at
+          INSERT INTO users (id, name, cpf, email, password, role, cnh, birth_date)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          RETURNING id, name, cpf, email, role, cnh, birth_date, created_at, updated_at
         `,
         [
           newUserId,
@@ -56,8 +55,7 @@ async function createUserInDB(userData) {
           userData.password,
           userData.role,
           userData.cnh || null,
-          userData.birthYear || null,
-          userData.age || null,
+          userData.birthDate,
         ],
       );
 
@@ -93,7 +91,7 @@ async function getUserByEmail(email) {
     if (shouldUseDatabase()) {
       const result = await query(
         `
-          SELECT id, name, cpf, email, password, role, cnh, birth_year, age, created_at, updated_at, deleted_at
+          SELECT id, name, cpf, email, password, role, cnh, birth_date, created_at, updated_at, deleted_at
           FROM users
           WHERE email = $1 AND deleted_at IS NULL
         `,
@@ -124,7 +122,7 @@ async function getUserByCPF(cpf) {
     if (shouldUseDatabase()) {
       const result = await query(
         `
-          SELECT id, name, cpf, email, password, role, cnh, birth_year, age, created_at, updated_at, deleted_at
+          SELECT id, name, cpf, email, password, role, cnh, birth_date, created_at, updated_at, deleted_at
           FROM users
           WHERE cpf = $1 AND deleted_at IS NULL
         `,
@@ -157,7 +155,7 @@ async function getUserByCNH(cnh) {
     if (shouldUseDatabase()) {
       const result = await query(
         `
-          SELECT id, name, cpf, email, password, role, cnh, birth_year, age, created_at, updated_at, deleted_at
+          SELECT id, name, cpf, email, password, role, cnh, birth_date, created_at, updated_at, deleted_at
           FROM users
           WHERE cnh = $1 AND role = 'DRIVER' AND deleted_at IS NULL
         `,
@@ -189,7 +187,7 @@ async function getUserById(id) {
     if (shouldUseDatabase()) {
       const result = await query(
         `
-          SELECT id, name, cpf, email, password, role, cnh, birth_year, age, created_at, updated_at, deleted_at
+          SELECT id, name, cpf, email, password, role, cnh, birth_date, created_at, updated_at, deleted_at
           FROM users
           WHERE id = $1
         `,
@@ -227,8 +225,7 @@ async function updateUser(id, updateData) {
         password: "password",
         role: "role",
         cnh: "cnh",
-        birthYear: "birth_year",
-        age: "age",
+        birthDate: "birth_date",
       };
 
       for (const [key, dbField] of Object.entries(fieldMap)) {
@@ -251,7 +248,7 @@ async function updateUser(id, updateData) {
           UPDATE users
           SET ${fields.join(", ")}
           WHERE id = $${index}
-          RETURNING id, name, cpf, email, role, cnh, birth_year, age, created_at, updated_at, deleted_at
+          RETURNING id, name, cpf, email, role, cnh, birth_date, created_at, updated_at, deleted_at
         `,
         values,
       );
@@ -329,7 +326,7 @@ async function getAllUsers() {
     if (shouldUseDatabase()) {
       const result = await query(
         `
-          SELECT id, name, cpf, email, role, cnh, birth_year, age, created_at, updated_at, deleted_at
+          SELECT id, name, cpf, email, role, cnh, birth_date, created_at, updated_at, deleted_at
           FROM users
           WHERE deleted_at IS NULL
           ORDER BY created_at DESC
