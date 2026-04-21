@@ -1,25 +1,27 @@
+import { theme } from "./theme";
+
 export const Colors = {
-  primary: '#6366F1',
-  secondary: '#EC4899',
-  success: '#10B981',
-  error: '#EF4444',
-  warning: '#F59E0B',
-  info: '#3B82F6',
-  light: '#F3F4F6',
-  dark: '#1F2937',
-  white: '#FFFFFF',
-  black: '#000000',
+  primary: theme.colors.brand.navy,
+  secondary: theme.colors.brand.orange,
+  success: theme.colors.feedback.success,
+  error: theme.colors.feedback.error,
+  warning: theme.colors.feedback.warning,
+  info: "#4B74D9",
+  light: theme.colors.background.app,
+  dark: theme.colors.text.primary,
+  white: theme.colors.text.inverse,
+  black: "#000000",
   gray: {
-    50: '#F9FAFB',
-    100: '#F3F4F6',
-    200: '#E5E7EB',
-    300: '#D1D5DB',
-    400: '#9CA3AF',
-    500: '#6B7280',
-    600: '#4B5563',
-    700: '#374151',
-    800: '#1F2937',
-    900: '#111827',
+    50: "#F8F9FC",
+    100: "#F0F2F7",
+    200: "#E4E8F0",
+    300: "#D4DAE4",
+    400: "#A5AFBD",
+    500: "#8A93A1",
+    600: "#5F6B7A",
+    700: "#334155",
+    800: "#1B2430",
+    900: "#0A2B5B",
   },
 };
 
@@ -43,9 +45,11 @@ export const FontSizes = {
 };
 
 export const BorderRadius = {
-  sm: 4,
-  md: 8,
-  lg: 12,
-  xl: 16,
+  sm: 10,
+  md: 14,
+  lg: 20,
+  xl: 28,
   full: 999,
 };
+
+export { theme };

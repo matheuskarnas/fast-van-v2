@@ -1,36 +1,56 @@
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+import { Platform } from "react-native";
+
+const DEFAULT_API_URL = Platform.select({
+  android: "http://10.0.2.2:3001",
+  ios: "http://localhost:3001",
+  default: "http://localhost:3001",
+});
+
+const API_URL =
+  process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL || "http://localhost:3001";
 
 export const ApiEndpoints = {
   // Auth
-  LOGIN: `${API_URL}/auth/login`,
-  REGISTER: `${API_URL}/auth/register`,
-  REFRESH_TOKEN: `${API_URL}/auth/refresh`,
-  LOGOUT: `${API_URL}/auth/logout`,
+  LOGIN: `${API_URL}/api/v1/auth/login`,
+  REGISTER: `${API_URL}/api/v1/auth/register`,
+  REFRESH_TOKEN: `${API_URL}/api/v1/auth/refresh`,
+  LOGOUT: `${API_URL}/api/v1/auth/logout`,
 
   // Users
-  GET_USER: `${API_URL}/users/:id`,
-  UPDATE_USER: `${API_URL}/users/:id`,
-  GET_PROFILE: `${API_URL}/users/profile`,
+  GET_USER: `${API_URL}/api/v1/users/:id`,
+  UPDATE_USER: `${API_URL}/api/v1/users/:id`,
+  GET_PROFILE: `${API_URL}/api/v1/users/profile`,
 
   // Vehicles
-  REGISTER_VEHICLE: `${API_URL}/vehicles`,
-  GET_VEHICLES: `${API_URL}/vehicles`,
-  UPDATE_VEHICLE: `${API_URL}/vehicles/:id`,
+  REGISTER_VEHICLE: `${API_URL}/api/v1/vehicles`,
+  GET_VEHICLES: `${API_URL}/api/v1/vehicles`,
+  UPDATE_VEHICLE: `${API_URL}/api/v1/vehicles/:id`,
 
   // Lines
-  CREATE_LINE: `${API_URL}/lines`,
-  GET_LINES: `${API_URL}/lines`,
-  GET_LINE: `${API_URL}/lines/:id`,
-  UPDATE_LINE: `${API_URL}/lines/:id`,
-  JOIN_LINE: `${API_URL}/lines/:id/join`,
+  CREATE_LINE: `${API_URL}/api/v1/lines`,
+  GET_LINES: `${API_URL}/api/v1/lines`,
+  GET_LINE: `${API_URL}/api/v1/lines/:id`,
+  UPDATE_LINE: `${API_URL}/api/v1/lines/:id`,
+  JOIN_LINE: `${API_URL}/api/v1/lines/:id/join`,
 
   // Chat
-  GET_CONVERSATIONS: `${API_URL}/chat/conversations`,
-  GET_MESSAGES: `${API_URL}/chat/conversations/:id/messages`,
-  SEND_MESSAGE: `${API_URL}/chat/messages`,
+  CREATE_PRIVATE_CONVERSATION: `${API_URL}/api/v1/chat/private/conversations`,
+  GET_PRIVATE_MESSAGES: `${API_URL}/api/v1/chat/private/conversations/:id/messages`,
+  SEND_PRIVATE_MESSAGE: `${API_URL}/api/v1/chat/private/conversations/:id/messages`,
+  MARK_PRIVATE_MESSAGES_READ: `${API_URL}/api/v1/chat/private/conversations/:id/read`,
+  PRIVATE_CONVERSATION_STREAM: `${API_URL}/api/v1/chat/private/conversations/:id/stream`,
+  CREATE_GROUP_CHAT: `${API_URL}/api/v1/chat/groups`,
+  GET_GROUP_MESSAGES: `${API_URL}/api/v1/chat/groups/:lineId/messages`,
+  SEND_GROUP_MESSAGE: `${API_URL}/api/v1/chat/groups/:lineId/messages`,
+  GROUP_CHAT_MEMBERS: `${API_URL}/api/v1/chat/groups/:lineId/members`,
+  GROUP_CHAT_STREAM: `${API_URL}/api/v1/chat/groups/:lineId/stream`,
 
-  // Location
-  UPDATE_LOCATION: `${API_URL}/location/update`,
+  // Geofencing
+  CREATE_GEOFENCE_LINE: `${API_URL}/api/v1/geofencing/lines`,
+  START_GEOFENCE_LINE: `${API_URL}/api/v1/geofencing/lines/:lineId/start`,
+  PROCESS_GEOFENCE_CHECKIN: `${API_URL}/api/v1/geofencing/lines/:lineId/check-ins`,
+  GET_GEOFENCE_EXECUTION: `${API_URL}/api/v1/geofencing/lines/:lineId/execution`,
+  GEOFENCE_STREAM: `${API_URL}/api/v1/geofencing/lines/:lineId/notifications/stream`,
 };
 
 export const API_TIMEOUT = 30000; // 30 seconds

@@ -1,4 +1,4 @@
-import { User } from './user';
+import { User } from "./user";
 
 export interface AuthResponse {
   success: boolean;
@@ -22,8 +22,7 @@ export interface RegisterRequest {
   cpf: string;
   email: string;
   password: string;
-  role: 'DRIVER' | 'PASSENGER';
-  age?: number;
+  role: "DRIVER" | "PASSENGER";
+  birthDate: string;
   cnh?: string;
-  birthYear?: number;
 }

@@ -3,17 +3,17 @@ export interface User {
   name: string;
   email: string;
   cpf: string;
-  role: 'DRIVER' | 'PASSENGER';
+  role: "DRIVER" | "PASSENGER";
   createdAt: string;
   updatedAt: string;
 }
 
 export interface Driver extends User {
   cnh: string;
-  birthYear: number;
+  birthDate: string;
   vehicle?: Vehicle;
 }
 
 export interface Passenger extends User {
-  age: number;
+  birthDate: string;
 }
