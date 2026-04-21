@@ -350,6 +350,35 @@ async function getPassengerPresenceStatus(lineId, passengerId, date) {
   };
 }
 
+async function listPassengerLinesByDate(passengerId, date) {
+  if (!passengerId) {
+    return {
+      success: false,
+      error: "Passageiro inválido",
+    };
+  }
+
+  if (!isValidDateString(date)) {
+    return {
+      success: false,
+      error: "Data de presença inválida",
+    };
+  }
+
+  const lines = mockPresenceDb.lines
+    .filter((line) => isPassengerActiveInLine(line, passengerId))
+    .map((line) => ({
+      lineId: line.id,
+      nextDate: line.nextDate,
+      status: getStatusForDate(line.id, passengerId, date),
+    }));
+
+  return {
+    success: true,
+    lines,
+  };
+}
+
 async function getConfirmedPassengersBySegment(lineId, date, driverId) {
   const line = getLine(lineId);
 
@@ -484,6 +513,7 @@ module.exports = {
   removePassengerFromLine,
   markPassengerPresence,
   getPassengerPresenceStatus,
+  listPassengerLinesByDate,
   getConfirmedPassengersBySegment,
   buildDailyRoute,
   getPresenceLineById,

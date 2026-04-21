@@ -33,6 +33,10 @@ export const ApiEndpoints = {
   UPDATE_LINE: `${API_URL}/api/v1/lines/:id`,
   JOIN_LINE: `${API_URL}/api/v1/lines/:id/join`,
 
+  // Presence (RF3)
+  GET_MY_PRESENCE_LINES: `${API_URL}/api/v1/presence/me/lines`,
+  UPDATE_MY_PRESENCE_STATUS: `${API_URL}/api/v1/presence/lines/:lineId/me/status`,
+
   // Chat
   CREATE_PRIVATE_CONVERSATION: `${API_URL}/api/v1/chat/private/conversations`,
   GET_PRIVATE_MESSAGES: `${API_URL}/api/v1/chat/private/conversations/:id/messages`,
