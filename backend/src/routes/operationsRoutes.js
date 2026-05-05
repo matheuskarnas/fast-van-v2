@@ -1,8 +1,39 @@
 const express = require("express");
 const { requireAuth } = require("../middlewares/authMiddleware");
 const { getLineAlerts } = require("../services/alertService");
+const { listDriverOperationalLines } = require("../services/presenceService");
 
 const router = express.Router();
+
+router.get("/lines", requireAuth, async (req, res, next) => {
+  try {
+    if (req.auth.role !== "DRIVER") {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN_RESOURCE",
+          message: "Somente motoristas podem acessar o dashboard operacional",
+        },
+      });
+    }
+
+    const result = await listDriverOperationalLines(req.auth.id);
+
+    if (result.success) {
+      return res.status(200).json(result);
+    }
+
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "OPERATIONS_LINES_FAILED",
+        message: result.error,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
 
 function mapOperationsError(errorMessage) {
   const mappings = {

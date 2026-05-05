@@ -58,6 +58,25 @@ describe("RF4/RF5 API HTTP: Dashboard Operacional", () => {
     );
   });
 
+  test("deve listar linhas operacionais do motorista", async () => {
+    const response = await request(app)
+      .get("/api/v1/operations/lines")
+      .set("Authorization", `Bearer ${ownerToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(Array.isArray(response.body.lines)).toBe(true);
+    expect(response.body.lines).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          lineId: "line-dashboard-1",
+          nextDate: "2026-05-25",
+          capacity: 10,
+        }),
+      ]),
+    );
+  });
+
   test("deve permitir acesso ao motorista atrelado", async () => {
     const response = await request(app)
       .get("/api/v1/operations/lines/line-dashboard-1/dashboard?date=2026-05-25")
@@ -70,6 +89,16 @@ describe("RF4/RF5 API HTTP: Dashboard Operacional", () => {
   test("deve bloquear acesso para passageiro", async () => {
     const response = await request(app)
       .get("/api/v1/operations/lines/line-dashboard-1/dashboard?date=2026-05-25")
+      .set("Authorization", `Bearer ${passengerToken}`);
+
+    expect(response.status).toBe(403);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe("FORBIDDEN_RESOURCE");
+  });
+
+  test("deve bloquear listagem de linhas operacionais para passageiro", async () => {
+    const response = await request(app)
+      .get("/api/v1/operations/lines")
       .set("Authorization", `Bearer ${passengerToken}`);
 
     expect(response.status).toBe(403);

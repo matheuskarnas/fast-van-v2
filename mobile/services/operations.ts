@@ -31,12 +31,49 @@ export interface OperationsDashboard {
   hasExceededAlert: boolean;
 }
 
+export interface OperationsLineSummary {
+  lineId: string;
+  nextDate?: string;
+  capacity?: number;
+  ownerDriverId?: string;
+  driverId?: string | null;
+}
+
 export interface OperationsErrorResponse {
   success: false;
   error?: {
     code?: string;
     message?: string;
   };
+}
+
+export interface OperationsLinesResponse {
+  success: boolean;
+  lines?: OperationsLineSummary[];
+  error?: {
+    code?: string;
+    message?: string;
+  };
+}
+
+export async function listOperationsLines() {
+  try {
+    const response = await apiService.get<OperationsLinesResponse>(
+      ApiEndpoints.LIST_OPERATIONS_LINES,
+    );
+
+    return response.data;
+  } catch (error: any) {
+    return {
+      success: false,
+      error: {
+        code: error?.response?.data?.error?.code || "NETWORK_ERROR",
+        message:
+          error?.response?.data?.error?.message ||
+          "Não foi possível carregar suas linhas operacionais.",
+      },
+    } as OperationsLinesResponse;
+  }
 }
 
 export async function getOperationsDashboard(lineId: string, date: string) {

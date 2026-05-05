@@ -57,6 +57,7 @@ export const ApiEndpoints = {
   GEOFENCE_STREAM: `${API_URL}/api/v1/geofencing/lines/:lineId/notifications/stream`,
 
   // Operations dashboard (RF4/RF5)
+  LIST_OPERATIONS_LINES: `${API_URL}/api/v1/operations/lines`,
   GET_OPERATIONS_DASHBOARD: `${API_URL}/api/v1/operations/lines/:lineId/dashboard`,
 };
 

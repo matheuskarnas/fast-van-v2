@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -6,14 +6,42 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
+import { DatePickerInput } from "../../../components/common/DatePickerInput";
 import { theme } from "../../../constants/theme";
 import {
   getOperationsDashboard,
+  listOperationsLines,
   type OperationsDashboard,
+  type OperationsLineSummary,
 } from "../../../services/operations";
+
+function parseDateStringToDate(dateString?: string) {
+  if (!dateString || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    return null;
+  }
+
+  const parsed = new Date(`${dateString}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function toISODate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getTomorrowDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  return date;
+}
 
 function getDashboardErrorMessage(errorCode?: string, fallback?: string) {
   const messages: Record<string, string> = {
@@ -78,21 +106,68 @@ function OccupancyCard({
 }
 
 export default function AlertsScreen() {
-  const [lineId, setLineId] = useState("line-dashboard-1");
-  const [date, setDate] = useState("2026-05-25");
+  const [linesLoading, setLinesLoading] = useState(true);
+  const [availableLines, setAvailableLines] = useState<OperationsLineSummary[]>(
+    [],
+  );
+  const [lineId, setLineId] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(getTomorrowDate());
   const [loading, setLoading] = useState(false);
   const [dashboard, setDashboard] = useState<OperationsDashboard | null>(null);
 
   const alerts = useMemo(() => dashboard?.alerts || [], [dashboard]);
 
+  const loadDriverLines = useCallback(async () => {
+    setLinesLoading(true);
+    const response = await listOperationsLines();
+    setLinesLoading(false);
+
+    if (!response.success) {
+      Alert.alert(
+        "Não foi possível carregar linhas",
+        getDashboardErrorMessage(response.error?.code, response.error?.message),
+      );
+      setAvailableLines([]);
+      setLineId(null);
+      return;
+    }
+
+    const lines = response.lines || [];
+    setAvailableLines(lines);
+
+    if (lines.length > 0) {
+      const preferredLine = lines[0];
+      setLineId((current) => current || preferredLine.lineId);
+
+      const preferredDate = parseDateStringToDate(preferredLine.nextDate);
+      setSelectedDate(preferredDate || getTomorrowDate());
+    } else {
+      setLineId(null);
+      setDashboard(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDriverLines();
+  }, [loadDriverLines]);
+
+  const handleSelectLine = (line: OperationsLineSummary) => {
+    setLineId(line.lineId);
+    const preferredDate = parseDateStringToDate(line.nextDate);
+    if (preferredDate) {
+      setSelectedDate(preferredDate);
+    }
+    setDashboard(null);
+  };
+
   const handleLoadDashboard = async () => {
-    if (!lineId.trim()) {
-      Alert.alert("Linha obrigatória", "Informe o ID da linha para continuar.");
+    if (!lineId) {
+      Alert.alert("Linha obrigatória", "Selecione uma linha para continuar.");
       return;
     }
 
     setLoading(true);
-    const result = await getOperationsDashboard(lineId.trim(), date.trim());
+    const result = await getOperationsDashboard(lineId, toISODate(selectedDate));
     setLoading(false);
 
     if (!result.success) {
@@ -115,36 +190,80 @@ export default function AlertsScreen() {
       </Text>
 
       <View style={styles.inputSection}>
-        <Text style={styles.label}>ID da linha</Text>
-        <TextInput
-          value={lineId}
-          onChangeText={setLineId}
-          style={styles.input}
-          placeholder="line-dashboard-1"
-          placeholderTextColor={theme.colors.text.muted}
-          editable={!loading}
-        />
+        <Text style={styles.label}>Linhas operacionais</Text>
 
-        <Text style={styles.label}>Data (YYYY-MM-DD)</Text>
-        <TextInput
-          value={date}
-          onChangeText={setDate}
-          style={styles.input}
-          placeholder="2026-05-25"
-          placeholderTextColor={theme.colors.text.muted}
-          editable={!loading}
+        {linesLoading ? (
+          <View style={styles.inlineLoaderBox}>
+            <ActivityIndicator color={theme.colors.brand.orangeDark} />
+            <Text style={styles.inlineLoaderText}>Carregando linhas...</Text>
+          </View>
+        ) : null}
+
+        {!linesLoading && availableLines.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyTitle}>Nenhuma linha operacional</Text>
+            <Text style={styles.emptyText}>
+              Você ainda não está vinculado a linhas com dashboard disponível.
+            </Text>
+          </View>
+        ) : null}
+
+        {!linesLoading && availableLines.length > 0 ? (
+          <View style={styles.linesWrap}>
+            {availableLines.map((line) => {
+              const isSelected = line.lineId === lineId;
+
+              return (
+                <Pressable
+                  key={line.lineId}
+                  style={[
+                    styles.lineButton,
+                    isSelected && styles.lineButtonSelected,
+                  ]}
+                  onPress={() => handleSelectLine(line)}
+                  disabled={loading}
+                >
+                  <Text
+                    style={[
+                      styles.lineButtonTitle,
+                      isSelected && styles.lineButtonTitleSelected,
+                    ]}
+                  >
+                    {line.lineId}
+                  </Text>
+                  <Text style={styles.lineButtonMeta}>
+                    Próxima data: {line.nextDate || "não informada"}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+
+        <DatePickerInput
+          label="Data de consulta"
+          value={selectedDate}
+          onChange={setSelectedDate}
         />
 
         <Pressable
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleLoadDashboard}
-          disabled={loading}
+          disabled={loading || !lineId}
         >
           {loading ? (
             <ActivityIndicator color={theme.colors.text.primary} />
           ) : (
             <Text style={styles.buttonText}>Atualizar dashboard</Text>
           )}
+        </Pressable>
+
+        <Pressable
+          style={[styles.secondaryButton, (loading || linesLoading) && styles.buttonDisabled]}
+          onPress={loadDriverLines}
+          disabled={loading || linesLoading}
+        >
+          <Text style={styles.secondaryButtonText}>Recarregar linhas</Text>
         </Pressable>
       </View>
 
@@ -244,14 +363,41 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: theme.font.sm,
   },
-  input: {
+  inlineLoaderBox: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+  },
+  inlineLoaderText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.font.sm,
+  },
+  linesWrap: {
+    gap: theme.spacing.sm,
+  },
+  lineButton: {
     borderWidth: 1,
-    borderColor: theme.colors.border.input,
-    borderRadius: theme.radius.md,
+    borderColor: theme.colors.border.soft,
     backgroundColor: theme.colors.background.input,
-    color: theme.colors.text.primary,
+    borderRadius: theme.radius.md,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
+    gap: theme.spacing.xs,
+  },
+  lineButtonSelected: {
+    borderColor: theme.colors.brand.orange,
+    backgroundColor: `${theme.colors.brand.orange}1A`,
+  },
+  lineButtonTitle: {
+    color: theme.colors.text.primary,
+    fontWeight: "800",
+  },
+  lineButtonTitleSelected: {
+    color: theme.colors.text.brand,
+  },
+  lineButtonMeta: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.font.sm,
   },
   button: {
     marginTop: theme.spacing.xs,
@@ -267,6 +413,33 @@ const styles = StyleSheet.create({
   buttonText: {
     color: theme.colors.text.primary,
     fontWeight: "800",
+  },
+  secondaryButton: {
+    borderWidth: 1,
+    borderColor: theme.colors.border.soft,
+    borderRadius: theme.radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.colors.background.input,
+  },
+  secondaryButtonText: {
+    color: theme.colors.text.secondary,
+    fontWeight: "700",
+  },
+  emptyBox: {
+    backgroundColor: theme.colors.background.muted,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    gap: theme.spacing.xs,
+  },
+  emptyTitle: {
+    color: theme.colors.text.primary,
+    fontWeight: "700",
+  },
+  emptyText: {
+    color: theme.colors.text.secondary,
+    lineHeight: 20,
   },
   dashboardSection: {
     gap: theme.spacing.sm,

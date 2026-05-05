@@ -379,6 +379,30 @@ async function listPassengerLinesByDate(passengerId, date) {
   };
 }
 
+async function listDriverOperationalLines(driverId) {
+  if (!driverId) {
+    return {
+      success: false,
+      error: "Motorista inválido",
+    };
+  }
+
+  const lines = mockPresenceDb.lines
+    .filter((line) => canDriverAccessLine(line, driverId))
+    .map((line) => ({
+      lineId: line.id,
+      nextDate: line.nextDate,
+      capacity: line.capacity,
+      ownerDriverId: line.ownerDriverId,
+      driverId: line.driverId,
+    }));
+
+  return {
+    success: true,
+    lines,
+  };
+}
+
 async function getConfirmedPassengersBySegment(lineId, date, driverId) {
   const line = getLine(lineId);
 
@@ -514,6 +538,7 @@ module.exports = {
   markPassengerPresence,
   getPassengerPresenceStatus,
   listPassengerLinesByDate,
+  listDriverOperationalLines,
   getConfirmedPassengersBySegment,
   buildDailyRoute,
   getPresenceLineById,
