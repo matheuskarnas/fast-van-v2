@@ -78,7 +78,10 @@ export async function listOperationsLines() {
 
 export async function getOperationsDashboard(lineId: string, date: string) {
   try {
-    const url = ApiEndpoints.GET_OPERATIONS_DASHBOARD.replace(":lineId", lineId);
+    const url = ApiEndpoints.GET_OPERATIONS_DASHBOARD.replace(
+      ":lineId",
+      lineId,
+    );
     const response = await apiService.get<OperationsDashboard>(
       `${url}?date=${encodeURIComponent(date)}`,
     );

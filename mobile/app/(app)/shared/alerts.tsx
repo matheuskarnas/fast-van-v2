@@ -17,70 +17,14 @@ import {
   type OperationsLineSummary,
 } from "../../../services/operations";
 
-function parseDateStringToDate(dateString?: string) {
-  if (!dateString || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-    return null;
-  }
-
-  const parsed = new Date(`${dateString}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  return parsed;
-}
-
-function toISODate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function getTomorrowDate() {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  return date;
-}
-
-function getDashboardErrorMessage(errorCode?: string, fallback?: string) {
-  const messages: Record<string, string> = {
-    FORBIDDEN_RESOURCE:
-      "Você não tem permissão para visualizar o dashboard desta linha.",
-    LINE_NOT_FOUND: "Linha não encontrada. Verifique o ID informado.",
-    INVALID_OCCUPANCY_DATE: "A data informada é inválida para consulta.",
-    NEXT_DATE_ONLY:
-      "A consulta só pode ser feita para a próxima data da linha.",
-    INVALID_LINE_CAPACITY:
-      "A linha está com capacidade inválida e não pode ser analisada.",
-    NETWORK_ERROR:
-      "Sem conexão com o servidor. Verifique sua internet e tente novamente.",
-  };
-
-  return (
-    messages[errorCode || ""] ||
-    fallback ||
-    "Não foi possível carregar o dashboard operacional."
-  );
-}
-
-function getAlertVisual(level: string) {
-  if (level === "capacity-exceeded") {
-    return {
-      bg: `${theme.colors.feedback.error}22`,
-      border: theme.colors.feedback.error,
-      text: theme.colors.feedback.error,
-      title: "Capacidade Excedida",
-    };
-  }
-
-  return {
-    bg: `${theme.colors.feedback.warning}25`,
-    border: theme.colors.feedback.warning,
-    text: theme.colors.text.primary,
-    title: "Lotação Crítica",
-  };
-}
+import {
+  getDashboardErrorMessage,
+  getAlertVisual,
+  getSelectedDateForLine,
+  getInitialOperationalSelection,
+  getTomorrowDate,
+  toISODate,
+} from "./alerts.helpers.js";
 
 function OccupancyCard({
   title,
@@ -135,13 +79,11 @@ export default function AlertsScreen() {
     const lines = response.lines || [];
     setAvailableLines(lines);
 
-    if (lines.length > 0) {
-      const preferredLine = lines[0];
-      setLineId((current) => current || preferredLine.lineId);
+    const selection = getInitialOperationalSelection(lines, getTomorrowDate());
+    setLineId((current) => current || selection.lineId);
+    setSelectedDate(selection.selectedDate);
 
-      const preferredDate = parseDateStringToDate(preferredLine.nextDate);
-      setSelectedDate(preferredDate || getTomorrowDate());
-    } else {
+    if (lines.length === 0) {
       setLineId(null);
       setDashboard(null);
     }
@@ -153,10 +95,7 @@ export default function AlertsScreen() {
 
   const handleSelectLine = (line: OperationsLineSummary) => {
     setLineId(line.lineId);
-    const preferredDate = parseDateStringToDate(line.nextDate);
-    if (preferredDate) {
-      setSelectedDate(preferredDate);
-    }
+    setSelectedDate(getSelectedDateForLine(line, getTomorrowDate()));
     setDashboard(null);
   };
 
@@ -167,7 +106,10 @@ export default function AlertsScreen() {
     }
 
     setLoading(true);
-    const result = await getOperationsDashboard(lineId, toISODate(selectedDate));
+    const result = await getOperationsDashboard(
+      lineId,
+      toISODate(selectedDate),
+    );
     setLoading(false);
 
     if (!result.success) {
@@ -259,7 +201,10 @@ export default function AlertsScreen() {
         </Pressable>
 
         <Pressable
-          style={[styles.secondaryButton, (loading || linesLoading) && styles.buttonDisabled]}
+          style={[
+            styles.secondaryButton,
+            (loading || linesLoading) && styles.buttonDisabled,
+          ]}
           onPress={loadDriverLines}
           disabled={loading || linesLoading}
         >
@@ -271,7 +216,9 @@ export default function AlertsScreen() {
         <View style={styles.dashboardSection}>
           <Text style={styles.sectionTitle}>Linha {dashboard.lineId}</Text>
           <Text style={styles.sectionMeta}>Data: {dashboard.date}</Text>
-          <Text style={styles.sectionMeta}>Capacidade: {dashboard.capacity}</Text>
+          <Text style={styles.sectionMeta}>
+            Capacidade: {dashboard.capacity}
+          </Text>
 
           <OccupancyCard
             title="Trecho de ida"

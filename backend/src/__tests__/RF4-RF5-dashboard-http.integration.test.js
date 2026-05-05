@@ -45,7 +45,9 @@ describe("RF4/RF5 API HTTP: Dashboard Operacional", () => {
 
   test("deve retornar dashboard de ocupação e alertas para motorista dono", async () => {
     const response = await request(app)
-      .get("/api/v1/operations/lines/line-dashboard-1/dashboard?date=2026-05-25")
+      .get(
+        "/api/v1/operations/lines/line-dashboard-1/dashboard?date=2026-05-25",
+      )
       .set("Authorization", `Bearer ${ownerToken}`);
 
     expect(response.status).toBe(200);
@@ -53,9 +55,9 @@ describe("RF4/RF5 API HTTP: Dashboard Operacional", () => {
     expect(response.body.occupancy).toBeDefined();
     expect(response.body.alerts).toBeDefined();
     expect(response.body.occupancy.outbound.percentage).toBe(80);
-    expect(response.body.alerts.some((alert) => alert.level === "critical")).toBe(
-      true,
-    );
+    expect(
+      response.body.alerts.some((alert) => alert.level === "critical"),
+    ).toBe(true);
   });
 
   test("deve listar linhas operacionais do motorista", async () => {
@@ -79,7 +81,9 @@ describe("RF4/RF5 API HTTP: Dashboard Operacional", () => {
 
   test("deve permitir acesso ao motorista atrelado", async () => {
     const response = await request(app)
-      .get("/api/v1/operations/lines/line-dashboard-1/dashboard?date=2026-05-25")
+      .get(
+        "/api/v1/operations/lines/line-dashboard-1/dashboard?date=2026-05-25",
+      )
       .set("Authorization", `Bearer ${linkedToken}`);
 
     expect(response.status).toBe(200);
@@ -88,7 +92,9 @@ describe("RF4/RF5 API HTTP: Dashboard Operacional", () => {
 
   test("deve bloquear acesso para passageiro", async () => {
     const response = await request(app)
-      .get("/api/v1/operations/lines/line-dashboard-1/dashboard?date=2026-05-25")
+      .get(
+        "/api/v1/operations/lines/line-dashboard-1/dashboard?date=2026-05-25",
+      )
       .set("Authorization", `Bearer ${passengerToken}`);
 
     expect(response.status).toBe(403);
@@ -108,7 +114,9 @@ describe("RF4/RF5 API HTTP: Dashboard Operacional", () => {
 
   test("deve bloquear motorista sem vínculo", async () => {
     const response = await request(app)
-      .get("/api/v1/operations/lines/line-dashboard-1/dashboard?date=2026-05-25")
+      .get(
+        "/api/v1/operations/lines/line-dashboard-1/dashboard?date=2026-05-25",
+      )
       .set("Authorization", `Bearer ${outsiderToken}`);
 
     expect(response.status).toBe(403);
@@ -118,7 +126,9 @@ describe("RF4/RF5 API HTTP: Dashboard Operacional", () => {
 
   test("deve retornar erro para linha inexistente", async () => {
     const response = await request(app)
-      .get("/api/v1/operations/lines/line-inexistente/dashboard?date=2026-05-25")
+      .get(
+        "/api/v1/operations/lines/line-inexistente/dashboard?date=2026-05-25",
+      )
       .set("Authorization", `Bearer ${ownerToken}`);
 
     expect(response.status).toBe(404);
@@ -128,7 +138,9 @@ describe("RF4/RF5 API HTTP: Dashboard Operacional", () => {
 
   test("deve retornar erro para data inválida", async () => {
     const response = await request(app)
-      .get("/api/v1/operations/lines/line-dashboard-1/dashboard?date=2026-99-99")
+      .get(
+        "/api/v1/operations/lines/line-dashboard-1/dashboard?date=2026-99-99",
+      )
       .set("Authorization", `Bearer ${ownerToken}`);
 
     expect(response.status).toBe(400);
