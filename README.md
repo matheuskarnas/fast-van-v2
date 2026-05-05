@@ -10,7 +10,7 @@ Aplicativo para facilitar o dia a dia de passageiros e motoristas de vans.
 - Mobile com autenticação, navegação por perfil, gestão de veículos, chat e fluxo de geofencing.
 - Qualidade atual validada:
 	- Backend lint: passando
-	- Backend testes: 10 suítes, 159 testes passando
+	- Backend testes: 12 suítes, 170 testes (1 falha conhecida em RF3-presence-http.integration)
 	- Mobile lint: passando
 
 ## Funcionalidades (MVP)
@@ -20,8 +20,8 @@ Aplicativo para facilitar o dia a dia de passageiros e motoristas de vans.
 | 1 | Cadastro de Usuários | ✅ Implementado (backend + mobile + testes) | Alta |
 | 2 | Cadastro e Gerenciamento de Rotas | ✅ Implementado no backend, mobile parcial | Alta |
 | 3 | Confirmação de Presença pelo Aluno | ✅ Implementado no backend, mobile parcial | Alta |
-| 4 | Ocupação da Van em Tempo Real | ✅ Backend implementado e testado, sem dashboard dedicado no mobile | Média |
-| 5 | Alerta de Lotação Crítica | ✅ Backend implementado e testado, tela mobile ainda placeholder | Média |
+| 4 | Ocupação da Van em Tempo Real | ✅ Backend + dashboard mobile inicial implementados | Média |
+| 5 | Alerta de Lotação Crítica | ✅ Backend + tela de alertas mobile integrada ao endpoint | Média |
 | 6 | Lista de Espera e Chamada de Van Extra | ⏳ Não implementado | Média |
 | 7 | Check-in por Geofencing | ✅ Implementado (backend + integração HTTP + tela mobile) | Média |
 | 8 | Registro de Ausência de Última Hora | ⏳ Não implementado | Baixa |
@@ -96,6 +96,7 @@ npm run mobile:web
 - RF7: [docs/RF7-criterios-aceite.md](docs/RF7-criterios-aceite.md)
 - RF13: [docs/RF13-criterios-aceite.md](docs/RF13-criterios-aceite.md)
 - RF3 Mobile (fase passageiro): [docs/RF3-mobile-criterios-aceite.md](docs/RF3-mobile-criterios-aceite.md)
+- RF4/RF5 Mobile (fase dashboard motorista): [docs/RF4-RF5-mobile-criterios-aceite.md](docs/RF4-RF5-mobile-criterios-aceite.md)
 
 ## Variáveis de Ambiente
 
@@ -117,7 +118,7 @@ EXPO_PUBLIC_ENV=development
 
 ## Próximas Entregas Recomendadas
 
-1. Fechar frontend de RF5 (tela de alertas com dados reais).
-2. Consolidar frontend de RF3/RF4 (presença e ocupação em visão operacional).
+1. Adicionar seleção de linha/data guiada no dashboard mobile (sem dependência de ID manual).
+2. Cobrir RF4/RF5 mobile com testes automatizados de serviço/tela.
 3. Definir escopo e critérios de aceite para RF6 e RF8 antes de implementação.
-4. Rodar smoke test fim a fim (cadastro, login, veículos, chat, geofencing).
+4. Rodar smoke test fim a fim (cadastro, login, veículos, chat, geofencing, presença, dashboard).

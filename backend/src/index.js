@@ -6,6 +6,7 @@ const vehicleRoutes = require("./routes/vehicleRoutes");
 const geofencingRoutes = require("./routes/geofencingRoutes");
 const chatRoutes = require("./routes/chatRoutes");
 const presenceRoutes = require("./routes/presenceRoutes");
+const operationsRoutes = require("./routes/operationsRoutes");
 const { testConnection, closePool } = require("./config/database");
 
 const app = express();
@@ -54,6 +55,7 @@ app.use("/api/v1/vehicles", vehicleRoutes);
 app.use("/api/v1/geofencing", geofencingRoutes);
 app.use("/api/v1/chat", chatRoutes);
 app.use("/api/v1/presence", presenceRoutes);
+app.use("/api/v1/operations", operationsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

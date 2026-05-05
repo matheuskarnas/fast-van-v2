@@ -55,6 +55,9 @@ export const ApiEndpoints = {
   PROCESS_GEOFENCE_CHECKIN: `${API_URL}/api/v1/geofencing/lines/:lineId/check-ins`,
   GET_GEOFENCE_EXECUTION: `${API_URL}/api/v1/geofencing/lines/:lineId/execution`,
   GEOFENCE_STREAM: `${API_URL}/api/v1/geofencing/lines/:lineId/notifications/stream`,
+
+  // Operations dashboard (RF4/RF5)
+  GET_OPERATIONS_DASHBOARD: `${API_URL}/api/v1/operations/lines/:lineId/dashboard`,
 };
 
 export const API_TIMEOUT = 30000; // 30 seconds
