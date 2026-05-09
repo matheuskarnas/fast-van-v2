@@ -99,3 +99,36 @@ export async function getOperationsDashboard(lineId: string, date: string) {
     } as OperationsErrorResponse;
   }
 }
+
+export async function createLineInvite(lineId: string) {
+  try {
+    const url = ApiEndpoints.CREATE_LINE_INVITE.replace(":lineId", lineId);
+    const response = await apiService.post<{ success: true; data: { token: string; url: string } }>(url);
+    return response.data;
+  } catch (error: any) {
+    return {
+      success: false,
+      error: {
+        code: error?.response?.data?.error?.code || "NETWORK_ERROR",
+        message:
+          error?.response?.data?.error?.message || "Não foi possível criar o link de convite.",
+      },
+    } as OperationsErrorResponse;
+  }
+}
+
+export async function acceptLineInvite(token: string) {
+  try {
+    const response = await apiService.post(ApiEndpoints.ACCEPT_LINE_INVITE, { token });
+    return response.data;
+  } catch (error: any) {
+    return {
+      success: false,
+      error: {
+        code: error?.response?.data?.error?.code || "NETWORK_ERROR",
+        message:
+          error?.response?.data?.error?.message || "Não foi possível aceitar o link de convite.",
+      },
+    } as OperationsErrorResponse;
+  }
+}

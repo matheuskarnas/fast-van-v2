@@ -71,7 +71,10 @@ function getSelectedDateForLine(line, fallbackDate = getTomorrowDate()) {
   return parseDateStringToDate(line?.nextDate) || fallbackDate;
 }
 
-function getInitialOperationalSelection(lines, fallbackDate = getTomorrowDate()) {
+function getInitialOperationalSelection(
+  lines,
+  fallbackDate = getTomorrowDate(),
+) {
   if (!Array.isArray(lines) || lines.length === 0) {
     return {
       lineId: null,

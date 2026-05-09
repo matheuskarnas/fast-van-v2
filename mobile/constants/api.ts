@@ -59,6 +59,9 @@ export const ApiEndpoints = {
   // Operations dashboard (RF4/RF5)
   LIST_OPERATIONS_LINES: `${API_URL}/api/v1/operations/lines`,
   GET_OPERATIONS_DASHBOARD: `${API_URL}/api/v1/operations/lines/:lineId/dashboard`,
+  // Line invites
+  CREATE_LINE_INVITE: `${API_URL}/api/v1/lines/:lineId/invite`,
+  ACCEPT_LINE_INVITE: `${API_URL}/api/v1/lines/invite/accept`,
 };
 
 export const API_TIMEOUT = 30000; // 30 seconds

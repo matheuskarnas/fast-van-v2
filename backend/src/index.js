@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const authRoutes = require("./routes/authRoutes");
 const vehicleRoutes = require("./routes/vehicleRoutes");
+const lineRoutes = require("./routes/lineRoutes");
 const geofencingRoutes = require("./routes/geofencingRoutes");
 const chatRoutes = require("./routes/chatRoutes");
 const presenceRoutes = require("./routes/presenceRoutes");
@@ -52,6 +53,7 @@ app.get("/health", async (req, res) => {
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/vehicles", vehicleRoutes);
+app.use("/api/v1/lines", lineRoutes);
 app.use("/api/v1/geofencing", geofencingRoutes);
 app.use("/api/v1/chat", chatRoutes);
 app.use("/api/v1/presence", presenceRoutes);
