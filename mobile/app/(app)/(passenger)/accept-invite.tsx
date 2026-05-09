@@ -1,12 +1,10 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
 import { router } from "expo-router";
-import { useAuth } from "@/hooks/useAuth";
 import { acceptLineInvite } from "@/services/operations";
 import { colors, theme } from "@/constants/theme";
 
 export default function AcceptInviteScreen() {
-  const { auth } = useAuth();
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -34,25 +32,12 @@ export default function AcceptInviteScreen() {
           },
         },
       ]);
-    } catch (error) {
+    } catch (_error) {
       Alert.alert("Erro", "Erro ao processar o convite. Tente novamente.");
     } finally {
       setLoading(false);
     }
   };
-
-  if (!auth?.user) {
-    return (
-      <View style={[theme.container, { justifyContent: "center", alignItems: "center" }]}>
-        <Text style={{ fontSize: 16, color: colors.textSecondary, marginBottom: 24 }}>
-          Você precisa estar logado para aceitar um convite.
-        </Text>
-        <TouchableOpacity style={theme.button} onPress={() => router.replace("/(auth)/login")}>
-          <Text style={theme.buttonText}>Fazer Login</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   return (
     <View style={[theme.container, { justifyContent: "center", paddingHorizontal: 24 }]}>
