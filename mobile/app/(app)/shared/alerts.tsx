@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { DatePickerInput } from "../../../components/common/DatePickerInput";
+import InviteButton from "../../../components/invite/InviteButton";
 import { theme } from "../../../constants/theme";
 import {
   getOperationsDashboard,
@@ -210,6 +211,23 @@ export default function AlertsScreen() {
         >
           <Text style={styles.secondaryButtonText}>Recarregar linhas</Text>
         </Pressable>
+
+        {lineId && (
+          <InviteButton
+            lineId={lineId}
+            label="Gerar Convite para Passageiro"
+            style={styles.inviteButton}
+            onSuccess={(token, url) => {
+              Alert.alert(
+                "Sucesso!",
+                "Compartilhe o link ou token com o passageiro.",
+              );
+            }}
+            onError={(error) => {
+              Alert.alert("Erro", error);
+            }}
+          />
+        )}
       </View>
 
       {dashboard ? (
