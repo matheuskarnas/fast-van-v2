@@ -151,8 +151,8 @@ Permitir que um motorista autenticado, com pelo menos um veículo cadastrado, cr
 ### Dados obrigatórios de linha (no momento da criação)
 
 - `vehicle_id` - Veículo/Van da linha (referência ao veículo cadastrado, deve pertencer ao motorista)
-- `origin_city` - Cidade de partida (ex: "Caçapava") - **obrigatório, apenas cidade**
-- `destination_place` - Local/ponto específico de destino (ex: "Fatec-SJC", "Centro de SP") - **obrigatório, será vinculado à API Google Maps futuramente**
+- `origin_city` - Cidade de partida (ex: "Caçapava") - **obrigatório, selecionada via API IBGE para padronização de nome oficial do município**
+- `destination_place` - Local/ponto específico de destino (ex: "Fatec-SJC", "Centro de SP") - **obrigatório, selecionado via Google Places API com geocodificação**
 - `owner_driver_id` - Motorista dono da van (identificado via token JWT)
 
 ### Dados opcionais na criação
@@ -178,7 +178,6 @@ Permitir que um motorista autenticado, com pelo menos um veículo cadastrado, cr
 - Cada ponto é atrelado a um ou mais passageiros
 - Cada ponto deve ter:
   - Endereço (obrigatório quando criado)
-  - Horário de parada (obrigatório quando criado)
   - Tipo (embarque ou desembarque)
   - Passageiros vinculados
 - Pode ser editado conforme a demanda de passageiros
@@ -215,7 +214,7 @@ Permitir que um motorista autenticado, com pelo menos um veículo cadastrado, cr
 **Dado** uma linha criada com origin_city e destination_place
 **E** um primeiro passageiro sendo adicionado à linha
 **Quando** o motorista (ou dono) adiciona o ponto de embarque do passageiro
-**Então** o ponto é criado com endereço e horário
+**Então** o ponto é criado com endereço e tipo
 **E** o ponto é vinculado à linha
 **E** o passageiro é atrelado a este ponto
 **E** o ponto aparece na listagem de pontos da linha
@@ -241,7 +240,7 @@ Permitir que um motorista autenticado, com pelo menos um veículo cadastrado, cr
 ### Cenário 2.15: Editar ponto de embarque/desembarque
 
 **Dado** um ponto de embarque/desembarque já criado na linha
-**Quando** o motorista edita endereço ou horário do ponto
+**Quando** o motorista edita endereço ou tipo do ponto
 **Então** as informações são atualizadas no sistema
 **E** passageiros vinculados ao ponto podem ser notificados (funcionalidade futura)
 
@@ -290,11 +289,11 @@ Permitir que um motorista autenticado, com pelo menos um veículo cadastrado, cr
 **Então** o sistema bloqueia a operação
 **E** exibe erro: `Veículo não encontrado ou não pertence a você`
 
-### Cenário 2.21: Adicionar ponto sem endereço ou horário
+### Cenário 2.21: Adicionar ponto sem endereço
 
 **Dado** um formulário de adição de ponto de embarque
-**Quando** o usuário deixa endereço ou horário em branco
-**Então** o sistema exibe erro: `Endereço e horário são obrigatórios para criar um ponto`
+**Quando** o usuário deixa o endereço em branco
+**Então** o sistema exibe erro: `Endereço é obrigatório para criar um ponto`
 **E** o ponto não é criado
 
 ### Cenário 2.22: Remover ponto com passageiros vinculados
@@ -331,7 +330,7 @@ Permitir que um motorista autenticado, com pelo menos um veículo cadastrado, cr
 - O link de convite deve ser único e resistir a colisões (usar UUID ou similar)
 - A estrutura permite múltiplas linhas por motorista, cada uma com seu próprio conjunto de pontos
 - Validação: `origin_city` (apenas cidade) e `destination_place` (ponto específico) são obrigatórios; horários são opcionais na criação
-- `destination_place` será integrado com API Google Maps no futuro para geocodificação e validação de endereço
-- Horários podem ser adicionados/editados depois da criação da linha (para flexibilidade)
+- `origin_city` é selecionada via API IBGE (https://servicodados.ibge.gov.br/api/v1/localidades/municipios) para garantir nome oficial padronizado. `destination_place` é selecionado via Google Places API com retorno de coordenadas e place_id
+- Pontos de embarque/desembarque não possuem horário fixo; o horário de passada depende da execução da rota no dia
 - O sistema deve impedir deleção de pontos com passageiros atrelados
 - Futuramente: notificação de passageiros quando pontos são editados ou removidos
