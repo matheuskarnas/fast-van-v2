@@ -9,25 +9,27 @@ const { createUser } = require("../services/authService");
 const { clearDatabase } = require("../services/userService");
 const {
   createVehicle,
-  getVehiclesByDriver,
   clearVehicleDatabase,
 } = require("../services/vehicleService");
 const {
   createLine,
   addPickupDropoffPoint,
+  updatePickupDropoffPoint,
+  removePickupDropoffPoint,
   removeLine,
   getLinesByDriver,
   getLineById,
   attachDriverToLine,
   clearLineDatabase,
 } = require("../services/lineService");
+const { createInvite } = require("../services/inviteService");
 
 describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
   const driverOwner = {
     name: "João Dono da Van",
     cpf: "123.456.789-09",
     cnh: "12345678901",
-    birthDate: '1988-01-01T00:00:00.000Z',
+    birthDate: "1988-01-01T00:00:00.000Z",
     email: "joao.owner@example.com",
     password: "Driver@123",
     role: "DRIVER",
@@ -37,19 +39,10 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
     name: "Pedro Motorista Operador",
     cpf: "987.654.321-00",
     cnh: "98765432100",
-    birthDate: '1990-01-01T00:00:00.000Z',
+    birthDate: "1990-01-01T00:00:00.000Z",
     email: "pedro.operator@example.com",
     password: "Driver@123",
     role: "DRIVER",
-  };
-
-  const passenger = {
-    name: "Ana Passageira",
-    cpf: "987.654.321-00",
-    birthDate: '2002-01-01T00:00:00.000Z',
-    email: "ana.passenger@example.com",
-    password: "Pass@123",
-    role: "PASSENGER",
   };
 
   const validVehicle = {
@@ -73,26 +66,24 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
     await clearVehicleDatabase();
     await clearDatabase();
 
-    // Criar motorista dono
     const ownerResult = await createUser(driverOwner);
     if (!ownerResult.success) {
       throw new Error(`Erro ao criar motorista dono: ${ownerResult.error.message}`);
     }
     driverOwnerId = ownerResult.user.id;
 
-    // Criar motorista operador
     const operatorResult = await createUser(driverOperator);
     if (!operatorResult.success) {
       throw new Error(`Erro ao criar motorista operador: ${operatorResult.error.message}`);
     }
     driverOperatorId = operatorResult.user.id;
 
-    // Criar veículo para o dono
     const vehicleResult = await createVehicle(driverOwnerId, validVehicle);
     if (!vehicleResult.success) {
-      const errorMsg = typeof vehicleResult.error === 'object' 
-        ? JSON.stringify(vehicleResult.error) 
-        : vehicleResult.error;
+      const errorMsg =
+        typeof vehicleResult.error === "object"
+          ? JSON.stringify(vehicleResult.error)
+          : vehicleResult.error;
       throw new Error(`Erro ao criar veículo: ${errorMsg}`);
     }
     vehicleId = vehicleResult.vehicle.id;
@@ -108,7 +99,7 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
         },
-        driverOwnerId
+        driverOwnerId,
       );
 
       expect(lineResult.success).toBe(true);
@@ -122,57 +113,46 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
       expect(lineResult.line.capacity).toBe(validVehicle.capacity);
     });
 
-    it("Cenário 2.11: deve atrelar segundo motorista à linha via link de convite", async () => {
+    it("Cenário 2.11: deve atrelar segundo motorista à linha", async () => {
       const lineResult = await createLine(
         {
           vehicleId,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
         },
-        driverOwnerId
+        driverOwnerId,
       );
 
       const lineId = lineResult.line.id;
 
-      // Gerar link de convite (simula a geração de um token/link único)
-      const inviteResult = {
-        success: true,
-        inviteToken: `invite-${lineId}-${Date.now()}`,
-      };
-      expect(inviteResult.success).toBe(true);
-      expect(inviteResult.inviteToken).toBeDefined();
-
-      // Segundo motorista aceita o convite
       const attachResult = await attachDriverToLine(
         lineId,
         driverOperatorId,
-        driverOwnerId
+        driverOwnerId,
       );
 
       expect(attachResult.success).toBe(true);
       expect(attachResult.line.driverId).toBe(driverOperatorId);
 
-      // Verificar que o motorista operador pode gerenciar a linha
       const fetchedLine = await getLineById(lineId, driverOperatorId);
       expect(fetchedLine.success).toBe(true);
       expect(fetchedLine.line.driverId).toBe(driverOperatorId);
     });
 
-    it("Cenário 2.12: deve adicionar ponto de embarque conforme passageiro é adicionado", async () => {
+    it("Cenário 2.12: deve adicionar ponto de embarque com endereço e tipo (sem horário)", async () => {
       const lineResult = await createLine(
         {
           vehicleId,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
         },
-        driverOwnerId
+        driverOwnerId,
       );
 
       const lineId = lineResult.line.id;
 
       const pointData = {
         address: "Rua das Flores, 100 - Caçapava",
-        time: "07:00",
         type: "pickup",
         passengerId: "passenger-1",
       };
@@ -180,14 +160,13 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
       const pointResult = await addPickupDropoffPoint(
         lineId,
         pointData,
-        driverOwnerId
+        driverOwnerId,
       );
 
       expect(pointResult.success).toBe(true);
       expect(pointResult.point).toBeDefined();
       expect(pointResult.point.address).toBe(pointData.address);
-      expect(pointResult.point.time).toBe(pointData.time);
-      expect(pointResult.point.type).toBe(pointData.type);
+      expect(pointResult.point.type).toBe("pickup");
       expect(pointResult.point.passengers).toContain("passenger-1");
     });
 
@@ -198,47 +177,18 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
         },
-        driverOwnerId
+        driverOwnerId,
       );
 
       const lineId = lineResult.line.id;
 
-      const point1 = {
-        address: "Ponto A - Caçapava",
-        time: "07:00",
-        type: "pickup",
-        passengerId: "passenger-1",
-      };
+      const point1 = { address: "Ponto A - Caçapava", type: "pickup", passengerId: "passenger-1" };
+      const point2 = { address: "Ponto B - Jacareí", type: "pickup", passengerId: "passenger-2" };
+      const dropoff = { address: "Fatec-SJC", type: "dropoff", passengerId: "passenger-1" };
 
-      const point2 = {
-        address: "Ponto B - Jacareí",
-        time: "07:30",
-        type: "pickup",
-        passengerId: "passenger-2",
-      };
-
-      const dropoffPoint = {
-        address: "Fatec-SJC",
-        time: "08:00",
-        type: "dropoff",
-        passengerId: "passenger-1",
-      };
-
-      const result1 = await addPickupDropoffPoint(
-        lineId,
-        point1,
-        driverOwnerId
-      );
-      const result2 = await addPickupDropoffPoint(
-        lineId,
-        point2,
-        driverOwnerId
-      );
-      const result3 = await addPickupDropoffPoint(
-        lineId,
-        dropoffPoint,
-        driverOwnerId
-      );
+      const result1 = await addPickupDropoffPoint(lineId, point1, driverOwnerId);
+      const result2 = await addPickupDropoffPoint(lineId, point2, driverOwnerId);
+      const result3 = await addPickupDropoffPoint(lineId, dropoff, driverOwnerId);
 
       expect(result1.success).toBe(true);
       expect(result2.success).toBe(true);
@@ -248,25 +198,24 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
       expect(line.line.pickupDropoffPoints.length).toBe(3);
     });
 
-    it("Cenário 2.14: deve gerar link de convite único para passageiro", async () => {
+    it("Cenário 2.14: deve gerar link de convite para passageiro via inviteService", async () => {
       const lineResult = await createLine(
         {
           vehicleId,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
         },
-        driverOwnerId
+        driverOwnerId,
       );
 
       const lineId = lineResult.line.id;
 
-      // Simular geração de link de convite
-      const invite1 = `fastvan.app/invite/${lineId}-${Date.now()}`;
-      const invite2 = `fastvan.app/invite/${lineId}-${Date.now() + 1}`;
+      const inviteResult = await createInvite(lineId, driverOwnerId);
 
-      expect(invite1).toBeDefined();
-      expect(invite2).toBeDefined();
-      expect(invite1).not.toBe(invite2);
+      expect(inviteResult.success).toBe(true);
+      expect(inviteResult.token).toBeDefined();
+      expect(inviteResult.url).toBeDefined();
+      expect(inviteResult.expiresAt).toBeDefined();
     });
 
     it("Cenário 2.15: deve editar ponto de embarque/desembarque", async () => {
@@ -276,88 +225,73 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
         },
-        driverOwnerId
+        driverOwnerId,
       );
 
       const lineId = lineResult.line.id;
 
-      const pointData = {
-        address: "Endereço Original",
-        time: "07:00",
-        type: "pickup",
-        passengerId: "passenger-1",
-      };
-
       const addResult = await addPickupDropoffPoint(
         lineId,
-        pointData,
-        driverOwnerId
+        { address: "Endereço Original", type: "pickup", passengerId: "passenger-1" },
+        driverOwnerId,
       );
+
       const pointId = addResult.point.id;
 
-      // Simular edição de ponto (backend deve atualizar no array)
-      const updatedPoint = {
-        ...addResult.point,
-        address: "Endereço Atualizado",
-        time: "07:15",
-      };
+      const updateResult = await updatePickupDropoffPoint(
+        lineId,
+        pointId,
+        { address: "Endereço Atualizado", type: "dropoff" },
+        driverOwnerId,
+      );
 
-      expect(updatedPoint.address).toBe("Endereço Atualizado");
-      expect(updatedPoint.time).toBe("07:15");
+      expect(updateResult.success).toBe(true);
+      expect(updateResult.point.address).toBe("Endereço Atualizado");
+      expect(updateResult.point.type).toBe("dropoff");
     });
 
-    it("Cenário 2.16: deve remover ponto vazio (sem passageiros)", async () => {
+    it("Cenário 2.16: deve remover ponto sem passageiros vinculados", async () => {
       const lineResult = await createLine(
         {
           vehicleId,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
         },
-        driverOwnerId
+        driverOwnerId,
       );
 
       const lineId = lineResult.line.id;
 
-      const pointData = {
-        address: "Ponto Temporário",
-        time: "07:00",
-        type: "pickup",
-        passengerId: "passenger-1",
-      };
-
       const addResult = await addPickupDropoffPoint(
         lineId,
-        pointData,
-        driverOwnerId
+        { address: "Ponto Temporário", type: "pickup" },
+        driverOwnerId,
       );
+
       const pointId = addResult.point.id;
 
-      // Remover ponto (pode ser removido se sem passageiros ou ser implementado depois)
-      const removeResult = {
-        success: true,
-        message: "Ponto removido com sucesso",
-      };
+      const removeResult = await removePickupDropoffPoint(
+        lineId,
+        pointId,
+        driverOwnerId,
+      );
 
       expect(removeResult.success).toBe(true);
+
+      const line = await getLineById(lineId, driverOwnerId);
+      const removed = line.line.pickupDropoffPoints.find((p) => p.id === pointId);
+      expect(removed).toBeUndefined();
     });
 
     it("Cenário 2.17: deve listar múltiplas linhas do motorista", async () => {
-      const line1 = await createLine(
-        {
-          vehicleId,
-          originCity: "Caçapava",
-          destinationPlace: "Fatec-SJC",
-        },
-        driverOwnerId
+      await createLine(
+        { vehicleId, originCity: "Caçapava", destinationPlace: "Fatec-SJC" },
+        driverOwnerId,
       );
 
-      const line2 = await createLine(
-        {
-          vehicleId,
-          originCity: "Caçapava",
-          destinationPlace: "Centro-SP",
-        },
-        driverOwnerId
+      await createLine(
+        { vehicleId, originCity: "Caçapava", destinationPlace: "Centro-SP" },
+        driverOwnerId,
       );
 
       const lines = await getLinesByDriver(driverOwnerId);
@@ -373,20 +307,15 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
 
   describe("Cenários de Erro", () => {
     it("Cenário 2.18: motorista sem veículo não pode criar linha", async () => {
-      // Criar novo motorista sem veículo
       const newDriverResult = await createUser({
         name: "Novo Motorista",
         cpf: "111.444.777-35",
         cnh: "12312312345",
-        birthDate: '1985-01-01T00:00:00.000Z',
+        birthDate: "1985-01-01T00:00:00.000Z",
         email: "novo.driver@example.com",
         password: "Driver@123",
         role: "DRIVER",
       });
-
-      if (!newDriverResult.success) {
-        throw new Error(`Erro ao criar motorista: ${newDriverResult.error.message}`);
-      }
 
       const newDriverId = newDriverResult.user.id;
 
@@ -396,7 +325,7 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
         },
-        newDriverId
+        newDriverId,
       );
 
       expect(lineResult.success).toBe(false);
@@ -405,76 +334,60 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
 
     it("Cenário 2.19: não pode criar linha sem origem e destino", async () => {
       const lineResult = await createLine(
-        {
-          vehicleId,
-          originCity: "",
-          destinationPlace: "",
-        },
-        driverOwnerId
+        { vehicleId, originCity: "", destinationPlace: "" },
+        driverOwnerId,
       );
 
       expect(lineResult.success).toBe(false);
       expect(lineResult.error).toContain("origem");
     });
 
-    it("Cenário 2.20: veículo deve pertencer ao motorista", async () => {
-      const lineResult = await createLine(
-        {
-          vehicleId: "vehicle-id-inexistente",
-          originCity: validLineData.originCity,
-          destinationPlace: validLineData.destinationPlace,
-        },
-        driverOwnerId
-      );
+    it("Cenário 2.20: veículo de outro motorista deve ser rejeitado", async () => {
+      const otherDriverResult = await createUser({
+        name: "Outro Motorista",
+        cpf: "222.333.444-05",
+        cnh: "22233344405",
+        birthDate: "1992-01-01T00:00:00.000Z",
+        email: "outro.driver@example.com",
+        password: "Driver@123",
+        role: "DRIVER",
+      });
 
-      // Em modo mock, aceitaremos veículo_id inválido como um aviso
-      // em produção, isso validaria contra o banco de dados real
-      // Por enquanto, vamos apenas verificar que a função responde apropriadamente
-      expect(lineResult).toBeDefined();
-      expect(lineResult.line || lineResult.error).toBeDefined();
-    });
+      const otherDriverId = otherDriverResult.user.id;
 
-    it("Cenário 2.21: ponto sem endereço ou horário não pode ser adicionado", async () => {
       const lineResult = await createLine(
         {
           vehicleId,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
         },
-        driverOwnerId
+        otherDriverId,
+      );
+
+      expect(lineResult.success).toBe(false);
+      expect(lineResult.error).toMatch(/veículo|pertence|não encontrado/i);
+    });
+
+    it("Cenário 2.21: ponto sem endereço não pode ser adicionado", async () => {
+      const lineResult = await createLine(
+        {
+          vehicleId,
+          originCity: validLineData.originCity,
+          destinationPlace: validLineData.destinationPlace,
+        },
+        driverOwnerId,
       );
 
       const lineId = lineResult.line.id;
 
-      const invalidPoint1 = {
-        address: "",
-        time: "07:00",
-        type: "pickup",
-        passengerId: "passenger-1",
-      };
-
-      const invalidPoint2 = {
-        address: "Ponto A",
-        time: "",
-        type: "pickup",
-        passengerId: "passenger-1",
-      };
-
-      const result1 = await addPickupDropoffPoint(
+      const result = await addPickupDropoffPoint(
         lineId,
-        invalidPoint1,
-        driverOwnerId
+        { address: "", type: "pickup", passengerId: "passenger-1" },
+        driverOwnerId,
       );
 
-      const result2 = await addPickupDropoffPoint(
-        lineId,
-        invalidPoint2,
-        driverOwnerId
-      );
-
-      expect(result1.success).toBe(false);
-      expect(result2.success).toBe(false);
-      expect(result1.error).toContain("obrigatório");
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("obrigatório");
     });
 
     it("Cenário 2.22: não pode remover ponto com passageiros vinculados", async () => {
@@ -484,34 +397,27 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
         },
-        driverOwnerId
+        driverOwnerId,
       );
 
       const lineId = lineResult.line.id;
 
-      const pointData = {
-        address: "Ponto com Passageiro",
-        time: "07:00",
-        type: "pickup",
-        passengerId: "passenger-1",
-      };
-
       const addResult = await addPickupDropoffPoint(
         lineId,
-        pointData,
-        driverOwnerId
+        { address: "Ponto com Passageiro", type: "pickup", passengerId: "passenger-1" },
+        driverOwnerId,
       );
 
       const pointId = addResult.point.id;
 
-      // Tentar remover ponto com passageiro
-      const removeResult = {
-        success: false,
-        error: "Remova os passageiros vinculados antes de deletar este ponto",
-      };
+      const removeResult = await removePickupDropoffPoint(
+        lineId,
+        pointId,
+        driverOwnerId,
+      );
 
       expect(removeResult.success).toBe(false);
-      expect(removeResult.error).toContain("passageiros");
+      expect(removeResult.error).toMatch(/passageiros|vinculados/i);
     });
 
     it("Cenário 2.23: motorista não autorizado não pode gerenciar linha", async () => {
@@ -521,12 +427,11 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
         },
-        driverOwnerId
+        driverOwnerId,
       );
 
       const lineId = lineResult.line.id;
 
-      // Tentar acessar linha com motorista não autorizado
       const unauthorizedResult = await getLineById(lineId, driverOperatorId);
 
       expect(unauthorizedResult.success).toBe(false);
@@ -540,7 +445,7 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
         },
-        driverOwnerId
+        driverOwnerId,
       );
 
       const lineId = lineResult.line.id;
@@ -548,7 +453,7 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
       const attachResult = await attachDriverToLine(
         lineId,
         "driver-id-inexistente",
-        driverOwnerId
+        driverOwnerId,
       );
 
       expect(attachResult.success).toBe(false);

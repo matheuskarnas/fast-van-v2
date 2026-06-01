@@ -6,6 +6,9 @@ const jwt = require("jsonwebtoken");
 const app = require("../index");
 const lineService = require("../services/lineService");
 const presenceService = require("../services/presenceService");
+const { createUser } = require("../services/authService");
+const { clearDatabase: clearUserDatabase } = require("../services/userService");
+const { createVehicle, clearVehicleDatabase } = require("../services/vehicleService");
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-secret-key-change-in-production";
@@ -15,27 +18,45 @@ function createToken(payload) {
 }
 
 describe("Line Invite HTTP: Endpoints de Convite para Linhas", () => {
-  const driverAuthId = "driver-test-1";
+  let driverAuthId;
+  let driverToken;
   const passengerAuthId = "passenger-test-1";
-  const driverToken = createToken({ id: driverAuthId, role: "DRIVER" });
   const passengerToken = createToken({ id: passengerAuthId, role: "PASSENGER" });
 
   let lineId;
 
   beforeAll(async () => {
-    // Limpar base de dados mock
     await lineService.clearLineDatabase();
+    await clearVehicleDatabase();
+    await clearUserDatabase();
 
-    // Criar linha
+    const driverResult = await createUser({
+      name: "Motorista Invite HTTP",
+      cpf: "123.456.789-09",
+      cnh: "12345678901",
+      birthDate: "1988-01-01T00:00:00.000Z",
+      email: "invite.http@example.com",
+      password: "Driver@123",
+      role: "DRIVER",
+    });
+    driverAuthId = driverResult.user.id;
+    driverToken = createToken({ id: driverAuthId, role: "DRIVER" });
+
+    const vehicleResult = await createVehicle(driverAuthId, {
+      plate: "HTP1X23",
+      model: "Sprinter",
+      year: 2020,
+      capacity: 16,
+    });
+
     const lineRes = await lineService.createLine(
-      { originCity: "City A", destinationPlace: "Place B", vehicleId: "veh-1" },
+      { originCity: "City A", destinationPlace: "Place B", vehicleId: vehicleResult.vehicle.id },
       driverAuthId,
     );
 
     if (!lineRes.success) throw new Error(lineRes.error);
     lineId = lineRes.line.id;
 
-    // Registrar presença (mock)
     await presenceService.createPresenceLine({
       lineId,
       driverId: driverAuthId,
@@ -75,7 +96,6 @@ describe("Line Invite HTTP: Endpoints de Convite para Linhas", () => {
   });
 
   test("POST /api/v1/lines/invite/accept - deve aceitar invite com sucesso", async () => {
-    // Criar invite primeiro
     const inviteRes = await request(app)
       .post(`/api/v1/lines/${lineId}/invite`)
       .set("Authorization", `Bearer ${driverToken}`);
@@ -83,7 +103,6 @@ describe("Line Invite HTTP: Endpoints de Convite para Linhas", () => {
     expect(inviteRes.status).toBe(201);
     const { token } = inviteRes.body.data;
 
-    // Aceitar invite
     const acceptRes = await request(app)
       .post("/api/v1/lines/invite/accept")
       .set("Authorization", `Bearer ${passengerToken}`)
@@ -94,14 +113,12 @@ describe("Line Invite HTTP: Endpoints de Convite para Linhas", () => {
   });
 
   test("POST /api/v1/lines/invite/accept - deve bloquear aceitação de invite para motorista", async () => {
-    // Criar invite
     const inviteRes = await request(app)
       .post(`/api/v1/lines/${lineId}/invite`)
       .set("Authorization", `Bearer ${driverToken}`);
 
     const { token } = inviteRes.body.data;
 
-    // Tentar aceitar com motorista
     const acceptRes = await request(app)
       .post("/api/v1/lines/invite/accept")
       .set("Authorization", `Bearer ${driverToken}`)

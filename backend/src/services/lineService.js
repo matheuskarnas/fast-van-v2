@@ -3,28 +3,17 @@
  * Responsável pela criação, atualização e gerenciamento de linhas de transporte
  */
 
-// Simulação de banco de dados em memória para testes
+// Lazy require em createLine para evitar dependência circular com vehicleService
+
 let mockLines = [];
 let mockPointId = 0;
 let lineIdCounter = 0;
 
 /**
- * Cria uma nova linha (rota) de transporte
- *
- * @param {Object} lineData - Dados da linha
- * @param {string} lineData.vehicleId - ID do veículo
- * @param {string} lineData.originCity - Cidade de partida
- * @param {string} lineData.destinationPlace - Ponto de destino específico
- * @param {string} [lineData.driverId] - ID do motorista operador (opcional)
- * @param {string} [lineData.departureTime] - Horário de partida (opcional)
- * @param {string} [lineData.arrivalTime] - Horário de chegada (opcional)
- * @param {string} [lineData.returnTime] - Horário de retorno (opcional)
- * @param {string} ownerDriverId - ID do motorista dono da van
- * @returns {Object} - Resultado da operação
+ * Cria uma nova linha de transporte
  */
 async function createLine(lineData, ownerDriverId) {
   try {
-    // Validações
     if (!lineData.originCity || lineData.originCity.trim() === "") {
       return {
         success: false,
@@ -46,13 +35,23 @@ async function createLine(lineData, ownerDriverId) {
       };
     }
 
-    // Verificar se o veículo pertence ao motorista dono (em modo mock)
-    // Em produção, isto seria validado contra o banco de dados
+    // Validar que o veículo pertence ao motorista dono
+    let vehicleCapacity = 16;
+
     if (process.env.USE_MOCK_DB === "true") {
-      // Simulação: assumir que o veículo é válido
-      // Em um cenário real, validaríamos isso contra a tabela de veículos
-    } else {
-      // Validar no banco de dados real (futura implementação)
+      const { getVehiclesByDriver } = require("./vehicleService");
+      const vehiclesResult = await getVehiclesByDriver(ownerDriverId);
+      const driverVehicles = vehiclesResult.success ? vehiclesResult.vehicles : [];
+      const matchedVehicle = driverVehicles.find((v) => v.id === lineData.vehicleId);
+
+      if (!matchedVehicle) {
+        return {
+          success: false,
+          error: "Veículo não encontrado ou não pertence a você",
+        };
+      }
+
+      vehicleCapacity = matchedVehicle.capacity || 16;
     }
 
     const newLine = {
@@ -66,19 +65,12 @@ async function createLine(lineData, ownerDriverId) {
       arrivalTime: lineData.arrivalTime || null,
       returnTime: lineData.returnTime || null,
       pickupDropoffPoints: [],
-      capacity: 16, // Será herdado do veículo em produção
+      capacity: vehicleCapacity,
       createdAt: new Date().toISOString(),
     };
 
-    // Salvar em mock ou banco de dados
     if (process.env.USE_MOCK_DB === "true") {
       mockLines.push(newLine);
-    } else {
-      // Implementar inserção em banco de dados real
-      // const result = await db.query(
-      //   `INSERT INTO lines (...) VALUES (...)`,
-      //   [...]
-      // );
     }
 
     return {
@@ -94,35 +86,19 @@ async function createLine(lineData, ownerDriverId) {
 }
 
 /**
- * Adiciona um ponto de embarque ou desembarque a uma linha
- *
- * @param {string} lineId - ID da linha
- * @param {Object} pointData - Dados do ponto
- * @param {string} pointData.address - Endereço do ponto
- * @param {string} pointData.time - Horário do ponto (HH:mm)
- * @param {string} pointData.type - Tipo do ponto (pickup ou dropoff)
- * @param {string} pointData.passengerId - ID do passageiro
- * @param {string} driverId - ID do motorista fazendo a operação (autorização)
- * @returns {Object} - Resultado da operação
+ * Adiciona um ponto de embarque ou desembarque a uma linha.
+ * O campo time não é obrigatório — o horário de passada depende da execução da rota.
+ * O campo passengerId é opcional — um ponto pode ser criado vazio.
  */
 async function addPickupDropoffPoint(lineId, pointData, driverId) {
   try {
-    // Validações
     if (!pointData.address || pointData.address.trim() === "") {
       return {
         success: false,
-        error: "Endereço e horário são obrigatórios para criar um ponto",
+        error: "Endereço é obrigatório para criar um ponto",
       };
     }
 
-    if (!pointData.time || pointData.time.trim() === "") {
-      return {
-        success: false,
-        error: "Endereço e horário são obrigatórios para criar um ponto",
-      };
-    }
-
-    // Encontrar a linha
     let line = null;
     if (process.env.USE_MOCK_DB === "true") {
       line = mockLines.find((l) => l.id === lineId);
@@ -135,7 +111,6 @@ async function addPickupDropoffPoint(lineId, pointData, driverId) {
       };
     }
 
-    // Verificar autorização (dono ou motorista atrelado)
     if (line.ownerDriverId !== driverId && line.driverId !== driverId) {
       return {
         success: false,
@@ -143,17 +118,16 @@ async function addPickupDropoffPoint(lineId, pointData, driverId) {
       };
     }
 
-    // Criar novo ponto
+    const passengers = pointData.passengerId ? [pointData.passengerId] : [];
+
     const newPoint = {
       id: `point-${++mockPointId}`,
       address: pointData.address,
-      time: pointData.time,
       type: pointData.type || "pickup",
-      passengers: [pointData.passengerId],
+      passengers,
       createdAt: new Date().toISOString(),
     };
 
-    // Adicionar ponto à linha
     line.pickupDropoffPoints.push(newPoint);
 
     return {
@@ -169,11 +143,102 @@ async function addPickupDropoffPoint(lineId, pointData, driverId) {
 }
 
 /**
+ * Atualiza um ponto de embarque/desembarque existente
+ */
+async function updatePickupDropoffPoint(lineId, pointId, updateData, driverId) {
+  try {
+    let line = null;
+    if (process.env.USE_MOCK_DB === "true") {
+      line = mockLines.find((l) => l.id === lineId);
+    }
+
+    if (!line) {
+      return { success: false, error: "Linha não encontrada" };
+    }
+
+    if (line.ownerDriverId !== driverId && line.driverId !== driverId) {
+      return { success: false, error: "Você não tem permissão para gerenciar esta linha" };
+    }
+
+    const point = line.pickupDropoffPoints.find((p) => p.id === pointId);
+
+    if (!point) {
+      return { success: false, error: "Ponto não encontrado" };
+    }
+
+    if (updateData.address !== undefined) {
+      if (!updateData.address || updateData.address.trim() === "") {
+        return { success: false, error: "Endereço é obrigatório para criar um ponto" };
+      }
+      point.address = updateData.address;
+    }
+
+    if (updateData.type !== undefined) {
+      point.type = updateData.type;
+    }
+
+    return {
+      success: true,
+      point,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Erro ao atualizar ponto: ${error.message}`,
+    };
+  }
+}
+
+/**
+ * Remove um ponto de embarque/desembarque.
+ * Só pode ser removido se não houver passageiros vinculados.
+ */
+async function removePickupDropoffPoint(lineId, pointId, driverId) {
+  try {
+    let line = null;
+    if (process.env.USE_MOCK_DB === "true") {
+      line = mockLines.find((l) => l.id === lineId);
+    }
+
+    if (!line) {
+      return { success: false, error: "Linha não encontrada" };
+    }
+
+    if (line.ownerDriverId !== driverId && line.driverId !== driverId) {
+      return { success: false, error: "Você não tem permissão para gerenciar esta linha" };
+    }
+
+    const pointIndex = line.pickupDropoffPoints.findIndex((p) => p.id === pointId);
+
+    if (pointIndex === -1) {
+      return { success: false, error: "Ponto não encontrado" };
+    }
+
+    const point = line.pickupDropoffPoints[pointIndex];
+
+    if (point.passengers && point.passengers.length > 0) {
+      return {
+        success: false,
+        error: "Remova os passageiros vinculados antes de deletar este ponto",
+      };
+    }
+
+    line.pickupDropoffPoints.splice(pointIndex, 1);
+
+    return {
+      success: true,
+      message: "Ponto removido com sucesso",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Erro ao remover ponto: ${error.message}`,
+    };
+  }
+}
+
+/**
  * Obtém uma linha pelo ID
- *
- * @param {string} lineId - ID da linha
- * @param {string} driverId - ID do motorista (para autorização)
- * @returns {Object} - Linha encontrada ou erro
  */
 async function getLineById(lineId, driverId) {
   try {
@@ -184,37 +249,21 @@ async function getLineById(lineId, driverId) {
     }
 
     if (!line) {
-      return {
-        success: false,
-        error: "Linha não encontrada",
-      };
+      return { success: false, error: "Linha não encontrada" };
     }
 
-    // Verificar autorização
     if (line.ownerDriverId !== driverId && line.driverId !== driverId) {
-      return {
-        success: false,
-        error: "Você não tem permissão para acessar esta linha",
-      };
+      return { success: false, error: "Você não tem permissão para acessar esta linha" };
     }
 
-    return {
-      success: true,
-      line,
-    };
+    return { success: true, line };
   } catch (error) {
-    return {
-      success: false,
-      error: `Erro ao buscar linha: ${error.message}`,
-    };
+    return { success: false, error: `Erro ao buscar linha: ${error.message}` };
   }
 }
 
 /**
  * Obtém todas as linhas de um motorista
- *
- * @param {string} driverId - ID do motorista
- * @returns {Object} - Lista de linhas
  */
 async function getLinesByDriver(driverId) {
   try {
@@ -226,67 +275,40 @@ async function getLinesByDriver(driverId) {
       );
     }
 
-    return {
-      success: true,
-      lines,
-    };
+    return { success: true, lines };
   } catch (error) {
-    return {
-      success: false,
-      error: `Erro ao buscar linhas: ${error.message}`,
-    };
+    return { success: false, error: `Erro ao buscar linhas: ${error.message}` };
   }
 }
 
 /**
- * Verifica se um veículo possui linha ativa vinculada.
- * No modo mock, considera ativa qualquer linha existente para o veículo.
- *
- * @param {string} vehicleId - ID do veículo
- * @param {string} [driverId] - ID do motorista para escopo opcional
- * @returns {Promise<boolean>} true quando houver linha ativa vinculada
+ * Verifica se um veículo possui linha ativa vinculada
  */
 async function hasActiveLineByVehicleId(vehicleId, driverId) {
   if (!vehicleId) return false;
 
   if (process.env.USE_MOCK_DB === "true") {
     return mockLines.some((line) => {
-      const isSameVehicle = line.vehicleId === vehicleId;
-      if (!isSameVehicle) return false;
-
+      if (line.vehicleId !== vehicleId) return false;
       if (!driverId) return true;
-
       return line.ownerDriverId === driverId || line.driverId === driverId;
     });
   }
 
-  // Ainda não há persistência de linhas em banco neste projeto.
   return false;
 }
 
 /**
  * Atrelar um segundo motorista à linha
- *
- * @param {string} lineId - ID da linha
- * @param {string} newDriverId - ID do novo motorista
- * @param {string} ownerDriverId - ID do dono da van (autorização)
- * @returns {Object} - Resultado da operação
  */
 async function attachDriverToLine(lineId, newDriverId, ownerDriverId) {
   try {
-    // Validações básicas
     if (!newDriverId || newDriverId === "") {
-      return {
-        success: false,
-        error: "Motorista não encontrado",
-      };
+      return { success: false, error: "Motorista não encontrado" };
     }
 
     if (newDriverId === "driver-id-inexistente") {
-      return {
-        success: false,
-        error: "Motorista não encontrado",
-      };
+      return { success: false, error: "Motorista não encontrado" };
     }
 
     let line = null;
@@ -296,40 +318,23 @@ async function attachDriverToLine(lineId, newDriverId, ownerDriverId) {
     }
 
     if (!line) {
-      return {
-        success: false,
-        error: "Linha não encontrada",
-      };
+      return { success: false, error: "Linha não encontrada" };
     }
 
-    // Apenas o dono pode atrelar um novo motorista
     if (line.ownerDriverId !== ownerDriverId) {
-      return {
-        success: false,
-        error: "Apenas o dono da van pode atrelar motoristas",
-      };
+      return { success: false, error: "Apenas o dono da van pode atrelar motoristas" };
     }
 
     line.driverId = newDriverId;
 
-    return {
-      success: true,
-      line,
-    };
+    return { success: true, line };
   } catch (error) {
-    return {
-      success: false,
-      error: `Erro ao atrelar motorista: ${error.message}`,
-    };
+    return { success: false, error: `Erro ao atrelar motorista: ${error.message}` };
   }
 }
 
 /**
  * Remove uma linha
- *
- * @param {string} lineId - ID da linha
- * @param {string} driverId - ID do motorista (autorização)
- * @returns {Object} - Resultado da operação
  */
 async function removeLine(lineId, driverId) {
   try {
@@ -344,23 +349,14 @@ async function removeLine(lineId, driverId) {
     }
 
     if (lineIndex === -1) {
-      return {
-        success: false,
-        error: "Linha não encontrada ou sem permissão",
-      };
+      return { success: false, error: "Linha não encontrada ou sem permissão" };
     }
 
     mockLines.splice(lineIndex, 1);
 
-    return {
-      success: true,
-      message: "Linha removida com sucesso",
-    };
+    return { success: true, message: "Linha removida com sucesso" };
   } catch (error) {
-    return {
-      success: false,
-      error: `Erro ao remover linha: ${error.message}`,
-    };
+    return { success: false, error: `Erro ao remover linha: ${error.message}` };
   }
 }
 
@@ -376,6 +372,8 @@ async function clearLineDatabase() {
 module.exports = {
   createLine,
   addPickupDropoffPoint,
+  updatePickupDropoffPoint,
+  removePickupDropoffPoint,
   getLineById,
   getLinesByDriver,
   hasActiveLineByVehicleId,
