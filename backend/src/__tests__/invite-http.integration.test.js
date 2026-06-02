@@ -106,7 +106,7 @@ describe("Line Invite HTTP: Endpoints de Convite para Linhas", () => {
     const acceptRes = await request(app)
       .post("/api/v1/lines/invite/accept")
       .set("Authorization", `Bearer ${passengerToken}`)
-      .send({ token });
+      .send({ token, departureTime: "07:10", arrivalTime: "12:35" });
 
     expect(acceptRes.status).toBe(200);
     expect(acceptRes.body.success).toBe(true);

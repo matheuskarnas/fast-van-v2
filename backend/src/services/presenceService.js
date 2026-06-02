@@ -357,8 +357,10 @@ async function listPassengerLinesByDate(passengerId, date) {
 
   if (shouldUseDatabase()) {
     const enrolled = await query(
-      `SELECT e.line_id, l.name, l.origin_city, l.destination_place,
-              COALESCE(p.status, $3) as status
+      `SELECT e.line_id, e.departure_time, e.arrival_time,
+              l.name, l.origin_city, l.destination_place,
+              COALESCE(p.status, $3) as status,
+              p.alternate_departure_time, p.alternate_arrival_time, p.slot_status
        FROM line_enrollments e
        JOIN lines l ON l.id = e.line_id
        LEFT JOIN presence_records p ON p.line_id = e.line_id AND p.passenger_id = e.passenger_id AND p.date = $2
@@ -374,6 +376,11 @@ async function listPassengerLinesByDate(passengerId, date) {
         destinationPlace: r.destination_place,
         nextDate: date,
         status: r.status,
+        departureTime: r.departure_time,
+        arrivalTime: r.arrival_time,
+        alternateDepartureTime: r.alternate_departure_time,
+        alternateArrivalTime: r.alternate_arrival_time,
+        slotStatus: r.slot_status || "confirmed",
       })),
     };
   }
@@ -432,27 +439,8 @@ async function listDriverOperationalLines(driverId) {
 }
 
 async function getConfirmedPassengersBySegment(lineId, date, driverId) {
-  const line = getLine(lineId);
-
-  if (!line) {
-    return {
-      success: false,
-      error: "Linha não encontrada",
-    };
-  }
-
-  if (!canDriverAccessLine(line, driverId)) {
-    return {
-      success: false,
-      error: "Você não tem permissão para visualizar esta linha",
-    };
-  }
-
   if (!isValidDateString(date)) {
-    return {
-      success: false,
-      error: "Data de presença inválida",
-    };
+    return { success: false, error: "Data de presença inválida" };
   }
 
   if (shouldUseDatabase()) {
@@ -468,9 +456,12 @@ async function getConfirmedPassengersBySegment(lineId, date, driverId) {
     return { success: true, confirmed: { outbound, return: returnTrip } };
   }
 
+  const line = getLine(lineId);
+  if (!line) return { success: false, error: "Linha não encontrada" };
+  if (!canDriverAccessLine(line, driverId)) return { success: false, error: "Você não tem permissão para visualizar esta linha" };
+
   const outbound = [];
   const returnTrip = [];
-
   line.passengerIds.forEach((passengerId) => {
     const status = getStatusForDate(lineId, passengerId, date);
     if (isConfirmedInOutbound(status)) outbound.push(passengerId);
@@ -481,51 +472,46 @@ async function getConfirmedPassengersBySegment(lineId, date, driverId) {
 }
 
 async function buildDailyRoute(lineId, date) {
-  const line = getLine(lineId);
-
-  if (!line) {
-    return {
-      success: false,
-      error: "Linha não encontrada",
-    };
-  }
-
   if (!isValidDateString(date)) {
-    return {
-      success: false,
-      error: "Data de presença inválida",
-    };
+    return { success: false, error: "Data de presença inválida" };
   }
+
+  if (shouldUseDatabase()) {
+    // Retorna pontos que têm ao menos 1 passageiro confirmado no trecho
+    const res = await query(
+      `SELECT lp.id, lp.address, lp.type, lp.segment
+       FROM line_points lp
+       WHERE lp.line_id = $1
+         AND EXISTS (
+           SELECT 1 FROM line_enrollments e
+           LEFT JOIN presence_records pr
+             ON pr.line_id = e.line_id AND pr.passenger_id = e.passenger_id AND pr.date = $2
+           WHERE e.line_id = $1
+             AND COALESCE(pr.status, $3) NOT IN ('não vai e nem volta',
+               CASE WHEN lp.segment = 'ida' THEN 'não vou mas volto' ELSE 'só vou e não volto' END)
+         )`,
+      [lineId, date, DEFAULT_STATUS],
+    );
+    return { success: true, points: res.rows };
+  }
+
+  const line = getLine(lineId);
+  if (!line) return { success: false, error: "Linha não encontrada" };
 
   const dailyPoints = [];
-
   line.points.forEach((point) => {
     const segment = getPointSegment(point);
-
     const confirmedPassengerIds = point.passengers.filter((passengerId) => {
-      if (!line.passengerIds.includes(passengerId)) {
-        return false;
-      }
-
+      if (!line.passengerIds.includes(passengerId)) return false;
       const status = getStatusForDate(lineId, passengerId, date);
-      return segment === "ida"
-        ? isConfirmedInOutbound(status)
-        : isConfirmedInReturn(status);
+      return segment === "ida" ? isConfirmedInOutbound(status) : isConfirmedInReturn(status);
     });
-
     if (confirmedPassengerIds.length > 0) {
-      dailyPoints.push({
-        ...point,
-        segment,
-        confirmedPassengerIds,
-      });
+      dailyPoints.push({ ...point, segment, confirmedPassengerIds });
     }
   });
 
-  return {
-    success: true,
-    points: dailyPoints,
-  };
+  return { success: true, points: dailyPoints };
 }
 
 async function clearPresenceDatabase() {
@@ -538,6 +524,25 @@ async function clearPresenceDatabase() {
 }
 
 async function getPresenceLineById(lineId) {
+  if (shouldUseDatabase()) {
+    const res = await query(
+      `SELECT id, capacity, owner_driver_id, driver_id FROM lines WHERE id = $1`,
+      [lineId],
+    );
+    if (!res.rows[0]) return { success: false, error: "Linha não encontrada" };
+    const r = res.rows[0];
+    return {
+      success: true,
+      line: {
+        lineId: r.id,
+        capacity: r.capacity,
+        ownerDriverId: r.owner_driver_id,
+        driverId: r.driver_id,
+        nextDate: new Date().toISOString().slice(0, 10),
+      },
+    };
+  }
+
   const line = getLine(lineId);
 
   if (!line) {

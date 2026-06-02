@@ -17,16 +17,34 @@ export interface OperationsAlert {
   message: string;
 }
 
+export interface RoutePoint {
+  id: string;
+  address: string;
+  type: string;
+  segment: string;
+}
+
+export interface SlotOccupancy {
+  slot: string;
+  confirmedCount: number;
+  percentage: number;
+}
+
 export interface OperationsDashboard {
   success: true;
   lineId: string;
   date: string;
   capacity: number;
+  slots: {
+    departureSlots: SlotOccupancy[];
+    arrivalSlots: SlotOccupancy[];
+  };
   occupancy: {
     outbound: SegmentOccupancy;
     return: SegmentOccupancy;
   };
   alerts: OperationsAlert[];
+  routePoints: RoutePoint[];
   hasCriticalAlert: boolean;
   hasExceededAlert: boolean;
 }

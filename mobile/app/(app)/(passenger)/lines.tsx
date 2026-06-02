@@ -125,9 +125,9 @@ export default function PassengerLinesScreen() {
       ) : (
         <FlatList
           data={lines}
-          keyExtractor={(item) => item.lineId}
+          keyExtractor={(item: PresenceLineSummary) => item.lineId}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => (
+          renderItem={({ item }: { item: PresenceLineSummary }) => (
             <LinePresenceCard
               line={item}
               saving={savingId === item.lineId}
@@ -177,6 +177,36 @@ function LinePresenceCard({
           </Text>
         </View>
       </View>
+
+      {/* Slot de horário do passageiro */}
+      {(line.departureTime || line.arrivalTime) && (
+        <View style={styles.slotRow}>
+          {line.departureTime && (
+            <View style={styles.slotBadge}>
+              <Ionicons name="arrow-forward-circle-outline" size={13} color={theme.colors.brand.orange} />
+              <Text style={styles.slotText}>Ida: {line.alternateDepartureTime ?? line.departureTime}</Text>
+            </View>
+          )}
+          {line.arrivalTime && (
+            <View style={styles.slotBadge}>
+              <Ionicons name="return-down-back-outline" size={13} color={theme.colors.brand.navy} />
+              <Text style={styles.slotText}>Volta: {line.alternateArrivalTime ?? line.arrivalTime}</Text>
+            </View>
+          )}
+          {line.slotStatus === "waitlist" && (
+            <View style={[styles.slotBadge, { backgroundColor: theme.colors.feedback.warning + "20", borderColor: theme.colors.feedback.warning }]}>
+              <Ionicons name="time-outline" size={13} color={theme.colors.feedback.warning} />
+              <Text style={[styles.slotText, { color: theme.colors.feedback.warning }]}>Fila de espera</Text>
+            </View>
+          )}
+          {line.slotStatus === "switched" && (
+            <View style={[styles.slotBadge, { backgroundColor: theme.colors.feedback.success + "20", borderColor: theme.colors.feedback.success }]}>
+              <Ionicons name="swap-horizontal-outline" size={13} color={theme.colors.feedback.success} />
+              <Text style={[styles.slotText, { color: theme.colors.feedback.success }]}>Horário trocado</Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Opções de presença */}
       <Text style={styles.optionsLabel}>Minha presença amanhã:</Text>
@@ -273,6 +303,19 @@ const styles = StyleSheet.create({
     maxWidth: 120,
   },
   statusBadgeText: { fontSize: theme.font.xs, fontWeight: "700" },
+  slotRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
+  slotBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 3,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.border.soft,
+    backgroundColor: theme.colors.background.muted,
+  },
+  slotText: { fontSize: theme.font.xs, fontWeight: "600", color: theme.colors.text.secondary },
   optionsLabel: { fontSize: theme.font.xs, fontWeight: "700", color: theme.colors.text.secondary, textTransform: "uppercase", letterSpacing: 0.5 },
   options: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
   optBtn: {

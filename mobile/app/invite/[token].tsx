@@ -4,6 +4,7 @@ import {
   Alert,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -24,12 +25,46 @@ interface LinePreview {
   originCity: string;
   destinationPlace: string;
   capacity: number;
+  arrivalTimes: string[];
+  departureTimes: string[];
 }
 
 interface InvitePreview {
   lineId: string;
   expiresAt: string;
   line: LinePreview | null;
+}
+
+function SlotPicker({
+  label,
+  slots,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  slots: string[];
+  selected: string | null;
+  onSelect: (s: string) => void;
+}) {
+  if (!slots || slots.length === 0) return null;
+  return (
+    <View style={styles.slotSection}>
+      <Text style={styles.slotLabel}>{label}</Text>
+      <View style={styles.slotRow}>
+        {slots.map((s) => (
+          <Pressable
+            key={s}
+            style={[styles.slotChip, selected === s && styles.slotChipSelected]}
+            onPress={() => onSelect(s)}
+          >
+            <Text style={[styles.slotChipText, selected === s && styles.slotChipTextSelected]}>
+              {s}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
 }
 
 export default function InviteScreen() {
@@ -41,6 +76,8 @@ export default function InviteScreen() {
   const [loadingPreview, setLoadingPreview] = useState(true);
   const [accepting, setAccepting] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [selectedDeparture, setSelectedDeparture] = useState<string | null>(null);
+  const [selectedArrival, setSelectedArrival] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -52,8 +89,14 @@ export default function InviteScreen() {
       const url = ApiEndpoints.PREVIEW_INVITE.replace(":token", token!);
       const res = await fetch(url);
       const json = await res.json();
-      if (json.success) setPreview(json.invite);
-      else setPreviewError(json.error?.message ?? "Convite inválido ou expirado.");
+      if (json.success) {
+        setPreview(json.invite);
+        // Pré-seleciona o primeiro slot disponível
+        if (json.invite?.line?.departureTimes?.[0]) setSelectedDeparture(json.invite.line.departureTimes[0]);
+        if (json.invite?.line?.arrivalTimes?.[0]) setSelectedArrival(json.invite.line.arrivalTimes[0]);
+      } else {
+        setPreviewError(json.error?.message ?? "Convite inválido ou expirado.");
+      }
     } catch {
       setPreviewError("Não foi possível carregar os detalhes do convite.");
     } finally {
@@ -68,13 +111,33 @@ export default function InviteScreen() {
 
   const handleAccept = async () => {
     if (!token) return;
+    if (!selectedDeparture || !selectedArrival) {
+      Alert.alert("Selecione os horários", "Escolha seu horário de ida e de volta antes de confirmar.");
+      return;
+    }
     setAccepting(true);
     try {
-      const res = await apiService.post(ApiEndpoints.ACCEPT_LINE_INVITE, { token });
+      const res = await apiService.post<{ success: boolean; error?: { code?: string; message?: string } }>(ApiEndpoints.ACCEPT_LINE_INVITE, {
+        token,
+        departureTime: selectedDeparture,
+        arrivalTime: selectedArrival,
+      });
       if (res.data?.success) {
         router.replace("/(app)/(passenger)/lines");
       } else {
-        Alert.alert("Erro", res.data?.error?.message ?? "Não foi possível entrar na linha.");
+        const code = res.data?.error?.code;
+        if (code === "SLOT_FULL") {
+          Alert.alert(
+            "Slot lotado",
+            `O horário das ${selectedDeparture} está cheio. Deseja entrar na lista de espera?`,
+            [
+              { text: "Não", style: "cancel" },
+              { text: "Entrar na fila", onPress: () => router.replace("/(app)/(passenger)/lines") },
+            ],
+          );
+        } else {
+          Alert.alert("Erro", res.data?.error?.message ?? "Não foi possível entrar na linha.");
+        }
       }
     } catch (e: any) {
       Alert.alert("Erro", e?.response?.data?.error?.message ?? "Não foi possível entrar na linha.");
@@ -115,10 +178,12 @@ export default function InviteScreen() {
   }
 
   const line = preview?.line;
+  const hasSlots = (line?.departureTimes?.length ?? 0) > 0 || (line?.arrivalTimes?.length ?? 0) > 0;
+  const canConfirm = !hasSlots || (!!selectedDeparture && !!selectedArrival);
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.iconWrap}>
           <Ionicons name="bus" size={40} color={theme.colors.brand.orange} />
         </View>
@@ -138,7 +203,7 @@ export default function InviteScreen() {
             </View>
           )}
           {line?.capacity && (
-            <Text style={styles.capacityText}>{line.capacity} lugares</Text>
+            <Text style={styles.capacityText}>{line.capacity} lugares por slot</Text>
           )}
         </View>
 
@@ -147,10 +212,30 @@ export default function InviteScreen() {
             <Text style={styles.loggedAs}>
               Entrando como <Text style={styles.loggedName}>{session.name ?? "você"}</Text>
             </Text>
+
+            {hasSlots && (
+              <View style={styles.slotCard}>
+                <Text style={styles.slotCardTitle}>Escolha seus horários fixos</Text>
+                <Text style={styles.slotCardSub}>Estes serão seus horários padrão. Você poderá solicitar horários alternativos depois.</Text>
+                <SlotPicker
+                  label="Horário de ida"
+                  slots={line?.departureTimes ?? []}
+                  selected={selectedDeparture}
+                  onSelect={setSelectedDeparture}
+                />
+                <SlotPicker
+                  label="Horário de volta"
+                  slots={line?.arrivalTimes ?? []}
+                  selected={selectedArrival}
+                  onSelect={setSelectedArrival}
+                />
+              </View>
+            )}
+
             <Pressable
-              style={[styles.primaryBtn, accepting && styles.btnDisabled]}
+              style={[styles.primaryBtn, (!canConfirm || accepting) && styles.btnDisabled]}
               onPress={handleAccept}
-              disabled={accepting}
+              disabled={!canConfirm || accepting}
             >
               {accepting
                 ? <ActivityIndicator color={theme.colors.text.inverse} />
@@ -180,7 +265,7 @@ export default function InviteScreen() {
             </Pressable>
           </>
         )}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -190,7 +275,7 @@ export { PENDING_INVITE_KEY };
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background.screen },
   center: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: theme.spacing.xl },
-  content: { flex: 1, paddingHorizontal: theme.spacing.xl, paddingTop: theme.spacing.xxl, gap: theme.spacing.lg, alignItems: "center" },
+  content: { paddingHorizontal: theme.spacing.xl, paddingTop: theme.spacing.xxl, paddingBottom: theme.spacing.xxl, gap: theme.spacing.lg, alignItems: "center" },
   iconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: theme.colors.brand.orange + "15", justifyContent: "center", alignItems: "center" },
   headline: { fontSize: theme.font.xxl, fontWeight: "800", color: theme.colors.text.primary, textAlign: "center" },
   sub: { fontSize: theme.font.md, color: theme.colors.text.secondary, textAlign: "center" },
@@ -199,12 +284,22 @@ const styles = StyleSheet.create({
   routeRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing.xs, flexWrap: "wrap" },
   routeText: { fontSize: theme.font.md, color: theme.colors.text.primary, fontWeight: "600" },
   capacityText: { fontSize: theme.font.sm, color: theme.colors.text.secondary },
+  slotCard: { width: "100%", backgroundColor: theme.colors.background.card, borderRadius: theme.radius.lg, padding: theme.spacing.lg, gap: theme.spacing.md, borderWidth: 1, borderColor: theme.colors.border.soft },
+  slotCardTitle: { fontSize: theme.font.md, fontWeight: "800", color: theme.colors.text.primary },
+  slotCardSub: { fontSize: theme.font.sm, color: theme.colors.text.secondary, lineHeight: 20 },
+  slotSection: { gap: theme.spacing.sm },
+  slotLabel: { fontSize: theme.font.sm, fontWeight: "700", color: theme.colors.text.secondary, textTransform: "uppercase", letterSpacing: 0.5 },
+  slotRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
+  slotChip: { paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.sm, borderRadius: theme.radius.pill, borderWidth: 1.5, borderColor: theme.colors.border.default, backgroundColor: theme.colors.background.screen },
+  slotChipSelected: { borderColor: theme.colors.brand.orange, backgroundColor: theme.colors.brand.orange + "15" },
+  slotChipText: { fontSize: theme.font.md, fontWeight: "600", color: theme.colors.text.secondary },
+  slotChipTextSelected: { color: theme.colors.brand.orange, fontWeight: "800" },
   loggedAs: { fontSize: theme.font.sm, color: theme.colors.text.secondary },
   loggedName: { fontWeight: "700", color: theme.colors.text.primary },
   authPrompt: { fontSize: theme.font.md, color: theme.colors.text.secondary, textAlign: "center" },
   primaryBtn: { width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: theme.spacing.sm, backgroundColor: theme.colors.brand.orange, paddingVertical: theme.spacing.lg, borderRadius: theme.radius.pill },
   primaryBtnText: { color: theme.colors.text.inverse, fontSize: theme.font.md, fontWeight: "800" },
-  btnDisabled: { opacity: 0.6 },
+  btnDisabled: { opacity: 0.5 },
   secondaryBtn: { width: "100%", alignItems: "center", paddingVertical: theme.spacing.md, borderRadius: theme.radius.pill, borderWidth: 1.5, borderColor: theme.colors.border.default },
   secondaryBtnText: { color: theme.colors.text.primary, fontSize: theme.font.md, fontWeight: "700" },
   infoBox: { flexDirection: "row", gap: theme.spacing.sm, backgroundColor: theme.colors.brand.navy + "10", borderRadius: theme.radius.md, padding: theme.spacing.md, borderWidth: 1, borderColor: theme.colors.brand.navy + "30" },

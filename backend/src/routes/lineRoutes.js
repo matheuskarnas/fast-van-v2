@@ -158,10 +158,21 @@ router.get("/invite/:token/preview", async (req, res, next) => {
     const { query, shouldUseDatabase } = require("../config/database");
     let line = null;
     if (shouldUseDatabase()) {
-      const row = await query(`SELECT id, name, origin_city, destination_place, capacity FROM lines WHERE id = $1`, [result.invite.lineId]);
+      const row = await query(
+        `SELECT id, name, origin_city, destination_place, capacity, arrival_times, departure_times FROM lines WHERE id = $1`,
+        [result.invite.lineId],
+      );
       if (row.rows[0]) {
         const r = row.rows[0];
-        line = { id: r.id, name: r.name, originCity: r.origin_city, destinationPlace: r.destination_place, capacity: r.capacity };
+        line = {
+          id: r.id,
+          name: r.name,
+          originCity: r.origin_city,
+          destinationPlace: r.destination_place,
+          capacity: r.capacity,
+          arrivalTimes: r.arrival_times || [],
+          departureTimes: r.departure_times || [],
+        };
       }
     }
     return res.status(200).json({ success: true, invite: { lineId: result.invite.lineId, expiresAt: result.invite.expiresAt, line } });
@@ -197,13 +208,17 @@ router.post("/invite/accept", requireAuth, async (req, res, next) => {
         error: { code: "FORBIDDEN_RESOURCE", message: "Somente passageiros podem aceitar invites" },
       });
     }
-    const { token } = req.body || {};
+    const { token, departureTime, arrivalTime } = req.body || {};
     if (!token) {
       return res.status(400).json({ success: false, error: { code: "INVALID_PAYLOAD", message: "Token é obrigatório" } });
     }
-    const result = await acceptInvite(token, req.auth.id);
-    if (result.error) {
-      return res.status(400).json({ success: false, error: { code: "INVITE_ACCEPT_FAILED", message: result.error } });
+    if (!departureTime || !arrivalTime) {
+      return res.status(400).json({ success: false, error: { code: "INVALID_PAYLOAD", message: "Horário de ida e volta são obrigatórios" } });
+    }
+    const result = await acceptInvite(token, req.auth.id, { departureTime, arrivalTime });
+    if (!result.success) {
+      const status = result.code === "SLOT_FULL" ? 409 : 400;
+      return res.status(status).json({ success: false, error: { code: result.code || "INVITE_ACCEPT_FAILED", message: result.error } });
     }
     return res.status(200).json({ success: true });
   } catch (error) {

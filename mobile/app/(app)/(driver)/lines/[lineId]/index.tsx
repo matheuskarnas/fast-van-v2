@@ -131,9 +131,13 @@ export default function LineDetailsScreen() {
                 }
                 <Text style={styles.actionText}>Convidar</Text>
               </Pressable>
+              <Pressable style={styles.actionButton} onPress={() => router.push(`/lines/${lineId}/dashboard`)}>
+                <Ionicons name="bar-chart-outline" size={20} color={theme.colors.feedback.success} />
+                <Text style={[styles.actionText, { color: theme.colors.feedback.success }]}>Ocupação</Text>
+              </Pressable>
               <Pressable style={styles.actionButton} onPress={() => router.push(`/lines/${lineId}/point`)}>
                 <Ionicons name="add-circle-outline" size={20} color={theme.colors.brand.navy} />
-                <Text style={[styles.actionText, { color: theme.colors.brand.navy }]}>Adicionar ponto</Text>
+                <Text style={[styles.actionText, { color: theme.colors.brand.navy }]}>Ponto</Text>
               </Pressable>
             </View>
 

@@ -64,19 +64,38 @@ async function getInvite(token) {
   }
 }
 
-async function acceptInvite(token, passengerId) {
+async function acceptInvite(token, passengerId, options = {}) {
   try {
     const lookup = await getInvite(token);
     if (!lookup.success) return lookup;
 
     const { lineId } = lookup.invite;
+    const { departureTime = null, arrivalTime = null } = options;
 
     if (shouldUseDatabase()) {
+      // Verifica se o slot tem vagas (RF6 — prioridade por slot)
+      if (departureTime) {
+        const lineRes = await query(`SELECT capacity FROM lines WHERE id = $1`, [lineId]);
+        if (lineRes.rows[0]) {
+          const capacity = lineRes.rows[0].capacity;
+          const slotCount = await query(
+            `SELECT COUNT(*) FROM line_enrollments WHERE line_id = $1 AND departure_time = $2`,
+            [lineId, departureTime],
+          );
+          const taken = parseInt(slotCount.rows[0].count, 10);
+          if (taken >= capacity) {
+            return { success: false, error: "Slot lotado", code: "SLOT_FULL" };
+          }
+        }
+      }
+
       await query(
-        `INSERT INTO line_enrollments (id, line_id, passenger_id)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (line_id, passenger_id) DO NOTHING`,
-        [`enroll_${Date.now()}`, lineId, passengerId],
+        `INSERT INTO line_enrollments (id, line_id, passenger_id, departure_time, arrival_time)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (line_id, passenger_id) DO UPDATE
+           SET departure_time = EXCLUDED.departure_time,
+               arrival_time = EXCLUDED.arrival_time`,
+        [`enroll_${Date.now()}`, lineId, passengerId, departureTime, arrivalTime],
       );
     } else {
       const { addPassengerToLine } = require("./presenceService");

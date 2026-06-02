@@ -14,6 +14,11 @@ export interface PresenceLineSummary {
   destinationPlace?: string;
   nextDate?: string;
   status: PresenceStatus;
+  departureTime?: string | null;
+  arrivalTime?: string | null;
+  alternateDepartureTime?: string | null;
+  alternateArrivalTime?: string | null;
+  slotStatus?: "confirmed" | "switched" | "waitlist";
 }
 
 export interface PresenceError {
