@@ -617,6 +617,92 @@ function getPresenceStatusForDate(lineId, passengerId, date) {
   return getStatusForDate(lineId, passengerId, date);
 }
 
+function dateRange(from, to) {
+  const dates = [];
+  const cur = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T00:00:00`);
+  while (cur <= end) {
+    dates.push(cur.toISOString().slice(0, 10));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
+}
+
+async function getPassengerSummary(passengerId) {
+  const today = new Date().toISOString().slice(0, 10);
+  const pastDate = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+  const futureDate = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
+
+  if (shouldUseDatabase()) {
+    // Active lines
+    const linesRes = await query(
+      `SELECT e.line_id, e.departure_time, e.arrival_time,
+              l.name, l.origin_city, l.destination_place, l.capacity
+       FROM line_enrollments e
+       JOIN lines l ON l.id = e.line_id
+       WHERE e.passenger_id = $1`,
+      [passengerId],
+    );
+
+    // Presence records in range
+    const presRes = await query(
+      `SELECT line_id, date, status
+       FROM presence_records
+       WHERE passenger_id = $1 AND date >= $2 AND date <= $3`,
+      [passengerId, pastDate, futureDate],
+    );
+
+    const presMap = {};
+    presRes.rows.forEach((r) => { presMap[`${r.line_id}::${r.date}`] = r.status; });
+
+    const lines = linesRes.rows.map((r) => ({
+      lineId: r.line_id,
+      name: r.name,
+      originCity: r.origin_city,
+      destinationPlace: r.destination_place,
+      capacity: r.capacity,
+      departureTime: r.departure_time,
+      arrivalTime: r.arrival_time,
+    }));
+
+    const buildRange = (from, to) =>
+      dateRange(from, to).flatMap((date) =>
+        lines.map((l) => ({
+          date,
+          lineId: l.lineId,
+          lineName: l.name,
+          status: presMap[`${l.lineId}::${date}`] ?? DEFAULT_STATUS,
+        })),
+      );
+
+    const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+    const tomorrow = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
+
+    return {
+      success: true,
+      lines,
+      upcomingPresence: buildRange(today, futureDate),
+      recentHistory: buildRange(pastDate, yesterday),
+    };
+  }
+
+  // Mock: simplified version
+  const enrolledLines = mockPresenceDb.lines.filter((l) => l.passengerIds.includes(passengerId));
+  const lines = enrolledLines.map((l) => ({ lineId: l.id, name: l.id, departureTime: null, arrivalTime: null }));
+  const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+  const buildRange = (from, to) =>
+    dateRange(from, to).flatMap((date) =>
+      lines.map((l) => ({ date, lineId: l.lineId, status: getStatusForDate(l.lineId, passengerId, date) })),
+    );
+
+  return {
+    success: true,
+    lines,
+    upcomingPresence: buildRange(today, futureDate),
+    recentHistory: buildRange(pastDate, yesterday),
+  };
+}
+
 module.exports = {
   DEFAULT_STATUS,
   ALLOWED_STATUSES,
@@ -632,6 +718,7 @@ module.exports = {
   buildDailyRoute,
   getPresenceLineById,
   getPresenceStatusForDate,
+  getPassengerSummary,
   subscribeToPresenceChanges,
   clearPresenceDatabase,
 };

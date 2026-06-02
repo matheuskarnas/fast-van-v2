@@ -35,10 +35,17 @@ export default function PassengerHomeScreen() {
         Acompanhe linhas, chat privado e o chat do grupo da sua viagem.
       </Text>
 
+      <Link href={"/(app)/(passenger)/dashboard" as any} asChild>
+        <ActionCard
+          title="Meu dashboard"
+          description="Próximas viagens, histórico de presenças e situação de pagamentos."
+        />
+      </Link>
+
       <Link href="/(app)/(passenger)/lines" asChild>
         <ActionCard
-          title="Minhas linhas"
-          description="Consultar e confirmar presença nas próximas viagens."
+          title="Confirmar presença"
+          description="Confirmar presença nas viagens de amanhã."
         />
       </Link>
 

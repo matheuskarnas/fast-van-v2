@@ -3,6 +3,7 @@ const { requireAuth } = require("../middlewares/authMiddleware");
 const {
   markPassengerPresence,
   listPassengerLinesByDate,
+  getPassengerSummary,
 } = require("../services/presenceService");
 
 const router = express.Router();
@@ -102,6 +103,23 @@ router.patch("/lines/:lineId/me/status", requireAuth, async (req, res, next) => 
         message: result.error,
       },
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// RF26: Summary do passageiro (linhas ativas + próximos 7 dias + últimos 7 dias)
+router.get("/me/summary", requireAuth, async (req, res, next) => {
+  try {
+    if (req.auth.role !== "PASSENGER") {
+      return res.status(403).json({
+        success: false,
+        error: { code: "FORBIDDEN_RESOURCE", message: "Somente passageiros podem acessar este recurso" },
+      });
+    }
+    const result = await getPassengerSummary(req.auth.id);
+    if (result.success) return res.status(200).json(result);
+    return res.status(400).json({ success: false, error: { code: "SUMMARY_FAILED", message: result.error } });
   } catch (error) {
     return next(error);
   }
