@@ -33,6 +33,8 @@ const STATUS_COLORS: Record<PresenceStatus, string> = {
   "não vai e nem volta": theme.colors.feedback.error,
 };
 
+const ABSENT_ON_OUTBOUND: PresenceStatus[] = ["não vai e nem volta", "não vou mas volto"];
+
 function getErrorMessage(code?: string, fallback?: string) {
   const map: Record<string, string> = {
     PRESENCE_DEADLINE_EXPIRED: "O prazo para alterar presença nessa viagem já encerrou.",
@@ -40,6 +42,7 @@ function getErrorMessage(code?: string, fallback?: string) {
     INVALID_PRESENCE_DATE: "A data selecionada é inválida.",
     INVALID_PRESENCE_STATUS: "Status inválido.",
     NETWORK_ERROR: "Sem conexão. Verifique sua internet e tente novamente.",
+    SLOT_FULL: "Não há vagas disponíveis no seu horário. A van já está lotada para esta viagem.",
   };
   return map[code ?? ""] || fallback || "Não foi possível atualizar sua presença.";
 }
@@ -75,7 +78,7 @@ export default function PassengerLinesScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const handleUpdate = async (lineId: string, status: PresenceStatus) => {
+  const doUpdate = useCallback(async (lineId: string, status: PresenceStatus) => {
     setSavingId(lineId);
     const res = await updateMyPresenceStatus(lineId, targetDate, status);
     if (res.success) {
@@ -86,7 +89,23 @@ export default function PassengerLinesScreen() {
       Alert.alert("Não foi possível salvar", getErrorMessage(res.error?.code, res.error?.message));
     }
     setSavingId(null);
-  };
+  }, [targetDate]);
+
+  const handleUpdate = useCallback((lineId: string, status: PresenceStatus, currentStatus: PresenceStatus) => {
+    // RF8: confirmação ao reverter ausência de ida de última hora
+    if (status === "vai e volta" && ABSENT_ON_OUTBOUND.includes(currentStatus)) {
+      Alert.alert(
+        "Voltar para a van?",
+        "Você havia marcado ausência. Confirma que vai embarcar hoje?",
+        [
+          { text: "Cancelar", style: "cancel" },
+          { text: "Sim, vou embarcar", onPress: () => doUpdate(lineId, status) },
+        ],
+      );
+      return;
+    }
+    doUpdate(lineId, status);
+  }, [doUpdate]);
 
   if (loading) {
     return (
@@ -131,7 +150,7 @@ export default function PassengerLinesScreen() {
             <LinePresenceCard
               line={item}
               saving={savingId === item.lineId}
-              onUpdate={(status) => handleUpdate(item.lineId, status)}
+              onUpdate={(status) => handleUpdate(item.lineId, status, item.status)}
             />
           )}
         />
@@ -214,12 +233,14 @@ function LinePresenceCard({
         {STATUS_OPTIONS.map((opt) => {
           const selected = line.status === opt.value;
           const color = STATUS_COLORS[opt.value];
+          const isRf8 = opt.value === "vai e volta" && ABSENT_ON_OUTBOUND.includes(line.status);
           return (
             <Pressable
               key={opt.value}
               style={[
                 styles.optBtn,
                 selected && { borderColor: color, backgroundColor: color + "15" },
+                isRf8 && { borderColor: theme.colors.feedback.success, borderWidth: 2 },
               ]}
               onPress={() => !saving && !selected && onUpdate(opt.value)}
               disabled={saving}
@@ -230,11 +251,15 @@ function LinePresenceCard({
                 <Ionicons
                   name={opt.icon as any}
                   size={18}
-                  color={selected ? color : theme.colors.text.muted}
+                  color={selected ? color : isRf8 ? theme.colors.feedback.success : theme.colors.text.muted}
                 />
               )}
-              <Text style={[styles.optText, selected && { color, fontWeight: "700" }]}>
-                {opt.label}
+              <Text style={[
+                styles.optText,
+                selected && { color, fontWeight: "700" },
+                isRf8 && { color: theme.colors.feedback.success, fontWeight: "700" },
+              ]}>
+                {isRf8 ? "Ir mesmo assim" : opt.label}
               </Text>
             </Pressable>
           );

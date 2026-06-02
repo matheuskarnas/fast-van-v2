@@ -25,6 +25,10 @@ function mapPresenceError(errorMessage) {
       status: 409,
       code: "PRESENCE_DEADLINE_EXPIRED",
     },
+    "Não há vagas disponíveis no seu horário": {
+      status: 409,
+      code: "SLOT_FULL",
+    },
   };
 
   return (

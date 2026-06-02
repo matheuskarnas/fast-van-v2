@@ -297,6 +297,61 @@ async function markPassengerPresence(
     }
   }
 
+  // RF8: ao reverter ausência de ida para "vai e volta", verifica vaga no slot
+  if (status === "vai e volta" || status === "só vou e não volto") {
+    const previousStatus = shouldUseDatabase()
+      ? null
+      : getStatusForDate(lineId, passengerId, date);
+
+    const wasAbsentOnOutbound =
+      previousStatus === "não vai e nem volta" ||
+      previousStatus === "não vou mas volto";
+
+    if (!shouldUseDatabase() && wasAbsentOnOutbound) {
+      const capacity = line?.capacity;
+      if (typeof capacity === "number" && capacity > 0) {
+        const confirmedOutbound = line.passengerIds.filter((pid) => {
+          if (pid === passengerId) return false;
+          const s = getStatusForDate(lineId, pid, date);
+          return isConfirmedInOutbound(s);
+        }).length;
+
+        if (confirmedOutbound >= capacity) {
+          return { success: false, error: "Não há vagas disponíveis no seu horário" };
+        }
+      }
+    }
+
+    if (shouldUseDatabase()) {
+      const lineRes = await query(
+        `SELECT l.capacity, e.departure_time
+         FROM lines l
+         JOIN line_enrollments e ON e.line_id = l.id AND e.passenger_id = $2
+         WHERE l.id = $1`,
+        [lineId, passengerId],
+      );
+      if (lineRes.rows[0]) {
+        const { capacity, departure_time } = lineRes.rows[0];
+        if (typeof capacity === "number" && capacity > 0) {
+          const slotCount = await query(
+            `SELECT COUNT(*)::int AS confirmed
+             FROM line_enrollments e
+             LEFT JOIN presence_records pr ON pr.line_id = e.line_id
+               AND pr.passenger_id = e.passenger_id AND pr.date = $3
+             WHERE e.line_id = $1
+               AND COALESCE(pr.alternate_departure_time, e.departure_time) = $2
+               AND e.passenger_id != $4
+               AND COALESCE(pr.status, 'vai e volta') IN ('vai e volta', 'só vou e não volto')`,
+            [lineId, departure_time, date, passengerId],
+          );
+          if (slotCount.rows[0].confirmed >= capacity) {
+            return { success: false, error: "Não há vagas disponíveis no seu horário" };
+          }
+        }
+      }
+    }
+  }
+
   if (shouldUseDatabase()) {
     await query(
       `INSERT INTO presence_records (id, line_id, passenger_id, date, status, updated_at)
