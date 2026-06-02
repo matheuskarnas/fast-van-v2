@@ -62,6 +62,12 @@ export const ApiEndpoints = {
   GET_OPERATIONS_DASHBOARD: `${API_URL}/api/v1/operations/lines/:lineId/dashboard`,
   POST_VAN_DECISION: `${API_URL}/api/v1/operations/lines/:lineId/decision`,
   GET_VAN_DECISION: `${API_URL}/api/v1/operations/lines/:lineId/decision`,
+  // Finance (RF24)
+  GET_FINANCE_DASHBOARD: `${API_URL}/api/v1/finance/dashboard`,
+  GET_LINE_PAYMENTS: `${API_URL}/api/v1/finance/lines/:lineId/payments`,
+  UPSERT_PAYMENT: `${API_URL}/api/v1/finance/lines/:lineId/payments/:passengerId`,
+  POST_FINANCE_ENTRY: `${API_URL}/api/v1/finance/entries`,
+  GET_MY_PAYMENT_STATUS: `${API_URL}/api/v1/finance/me/payment-status`,
   // Line invites
   CREATE_LINE_INVITE: `${API_URL}/api/v1/lines/:lineId/invite`,
   ACCEPT_LINE_INVITE: `${API_URL}/api/v1/lines/invite/accept`,

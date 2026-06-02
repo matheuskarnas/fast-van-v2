@@ -17,6 +17,13 @@ import { apiService } from "../../../services/api";
 import { ApiEndpoints } from "../../../constants/api";
 import { updateMyPresenceStatus, type PresenceStatus } from "../../../services/presence";
 
+interface PaymentStatus {
+  lineId: string;
+  lineName?: string;
+  amount?: number;
+  status: "paid" | "pending";
+}
+
 interface ActiveLine {
   lineId: string;
   name?: string;
@@ -85,22 +92,29 @@ function dayLabel(iso: string) {
 
 export default function PassengerDashboardScreen() {
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [payments, setPayments] = useState<PaymentStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiService.get<{ success: boolean } & Summary>(ApiEndpoints.GET_MY_SUMMARY);
-      if (res.data.success) {
+      const [summaryRes, paymentRes] = await Promise.all([
+        apiService.get<{ success: boolean } & Summary>(ApiEndpoints.GET_MY_SUMMARY),
+        apiService.get<{ success: boolean; payments: PaymentStatus[] }>(ApiEndpoints.GET_MY_PAYMENT_STATUS),
+      ]);
+      if (summaryRes.data.success) {
         setSummary({
-          lines: res.data.lines ?? [],
-          upcomingPresence: res.data.upcomingPresence ?? [],
-          recentHistory: res.data.recentHistory ?? [],
+          lines: summaryRes.data.lines ?? [],
+          upcomingPresence: summaryRes.data.upcomingPresence ?? [],
+          recentHistory: summaryRes.data.recentHistory ?? [],
         });
       }
+      if ((paymentRes.data as any).success) {
+        setPayments((paymentRes.data as any).payments ?? []);
+      }
     } catch {
-      // silently fail, user can retry
+      // silently fail
     } finally {
       setLoading(false);
     }
@@ -215,11 +229,19 @@ export default function PassengerDashboardScreen() {
                 )}
               </View>
             )}
-            {/* Pagamento placeholder */}
-            <View style={[styles.slotBadge, { backgroundColor: theme.colors.feedback.success + "15", borderColor: theme.colors.feedback.success + "40" }]}>
-              <Ionicons name="checkmark-circle-outline" size={12} color={theme.colors.feedback.success} />
-              <Text style={[styles.slotText, { color: theme.colors.feedback.success }]}>Pagamento em dia</Text>
-            </View>
+            {/* Status real de pagamento */}
+            {(() => {
+              const pay = payments.find((p) => p.lineId === line.lineId);
+              const isPaid = !pay || pay.status === "paid";
+              return (
+                <View style={[styles.slotBadge, { backgroundColor: (isPaid ? theme.colors.feedback.success : theme.colors.feedback.warning) + "15", borderColor: (isPaid ? theme.colors.feedback.success : theme.colors.feedback.warning) + "40" }]}>
+                  <Ionicons name={isPaid ? "checkmark-circle-outline" : "time-outline"} size={12} color={isPaid ? theme.colors.feedback.success : theme.colors.feedback.warning} />
+                  <Text style={[styles.slotText, { color: isPaid ? theme.colors.feedback.success : theme.colors.feedback.warning }]}>
+                    {isPaid ? "Mensalidade em dia" : `Mensalidade pendente${pay?.amount ? ` · R$ ${pay.amount.toFixed(2)}` : ""}`}
+                  </Text>
+                </View>
+              );
+            })()}
           </View>
         ))}
 
