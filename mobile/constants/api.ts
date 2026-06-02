@@ -73,6 +73,10 @@ export const ApiEndpoints = {
   ACCEPT_LINE_INVITE: `${API_URL}/api/v1/lines/invite/accept`,
   PREVIEW_INVITE: `${API_URL}/api/v1/lines/invite/:token/preview`,
 
+  // Ratings (RF14)
+  POST_RATING: `${API_URL}/api/v1/ratings`,
+  GET_DRIVER_RATINGS: `${API_URL}/api/v1/ratings/driver/:driverId`,
+  GET_MY_RATING: `${API_URL}/api/v1/ratings/me`,
   // Line points
   ADD_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points`,
   UPDATE_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points/:pointId`,

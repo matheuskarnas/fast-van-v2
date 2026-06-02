@@ -9,6 +9,7 @@ const chatRoutes = require("./routes/chatRoutes");
 const presenceRoutes = require("./routes/presenceRoutes");
 const operationsRoutes = require("./routes/operationsRoutes");
 const financeRoutes = require("./routes/financeRoutes");
+const ratingRoutes = require("./routes/ratingRoutes");
 const { testConnection, closePool } = require("./config/database");
 
 const app = express();
@@ -60,6 +61,7 @@ app.use("/api/v1/chat", chatRoutes);
 app.use("/api/v1/presence", presenceRoutes);
 app.use("/api/v1/operations", operationsRoutes);
 app.use("/api/v1/finance", financeRoutes);
+app.use("/api/v1/ratings", ratingRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

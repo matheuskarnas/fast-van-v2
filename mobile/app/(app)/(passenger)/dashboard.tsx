@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "../../../constants/theme";
 import { apiService } from "../../../services/api";
@@ -91,6 +92,7 @@ function dayLabel(iso: string) {
 }
 
 export default function PassengerDashboardScreen() {
+  const router = useRouter();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [payments, setPayments] = useState<PaymentStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -229,6 +231,15 @@ export default function PassengerDashboardScreen() {
                 )}
               </View>
             )}
+            {/* Botão avaliar */}
+            <Pressable
+              style={styles.rateBtn}
+              onPress={() => (router as any).push({ pathname: "/(app)/(passenger)/rate", params: { lineId: line.lineId, lineName: line.name } })}
+            >
+              <Ionicons name="star-outline" size={13} color={theme.colors.brand.orange} />
+              <Text style={styles.rateBtnText}>Avaliar</Text>
+            </Pressable>
+
             {/* Status real de pagamento */}
             {(() => {
               const pay = payments.find((p) => p.lineId === line.lineId);
@@ -347,4 +358,6 @@ const styles = StyleSheet.create({
   historyLine: { flex: 1, fontSize: theme.font.sm, color: theme.colors.text.primary },
   historyBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: theme.spacing.sm, paddingVertical: 3, borderRadius: theme.radius.pill },
   historyBadgeText: { fontSize: theme.font.xs, fontWeight: "700" },
+  rateBtn: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", paddingHorizontal: theme.spacing.sm, paddingVertical: 4, borderRadius: theme.radius.pill, borderWidth: 1, borderColor: theme.colors.brand.orange + "60", backgroundColor: theme.colors.brand.orange + "10" },
+  rateBtnText: { fontSize: theme.font.xs, fontWeight: "700", color: theme.colors.brand.orange },
 });
