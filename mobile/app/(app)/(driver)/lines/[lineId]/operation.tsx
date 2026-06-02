@@ -2,11 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -20,6 +22,15 @@ import {
   processGeofenceCheckIn,
   getLineExecutionState,
 } from "../../../../../services/geofencing";
+import { apiService } from "../../../../../services/api";
+import { ApiEndpoints } from "../../../../../constants/api";
+
+const OCCURRENCE_TYPES = [
+  { key: "slow_traffic", label: "Trânsito lento", icon: "car-outline" },
+  { key: "passenger_late", label: "Passageiro atrasado", icon: "time-outline" },
+  { key: "passenger_no_show", label: "Não apareceu", icon: "person-remove-outline" },
+  { key: "other", label: "Outro", icon: "alert-circle-outline" },
+] as const;
 
 const TODAY = new Date().toISOString().slice(0, 10);
 const DEFAULT_RADIUS_M = 150;
@@ -57,6 +68,10 @@ export default function LineOperationScreen() {
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const locationSub = useRef<Location.LocationSubscription | null>(null);
+  const [showOccurrenceModal, setShowOccurrenceModal] = useState(false);
+  const [occurrenceType, setOccurrenceType] = useState<string>("slow_traffic");
+  const [occurrenceNotes, setOccurrenceNotes] = useState("");
+  const [savingOccurrence, setSavingOccurrence] = useState(false);
 
   const loadLine = useCallback(async () => {
     if (!lineId) return;
@@ -151,6 +166,26 @@ export default function LineOperationScreen() {
     }
   };
 
+  const handleOccurrence = useCallback(async () => {
+    if (!lineId) return;
+    setSavingOccurrence(true);
+    try {
+      const url = ApiEndpoints.POST_OCCURRENCE.replace(":lineId", lineId);
+      await apiService.post(url, {
+        type: occurrenceType,
+        notes: occurrenceNotes.trim() || undefined,
+        latitude: currentLocation?.latitude ?? null,
+        longitude: currentLocation?.longitude ?? null,
+      });
+      setShowOccurrenceModal(false);
+      setOccurrenceNotes("");
+      Alert.alert("Ocorrência registrada", "Log salvo com data, hora e localização.");
+    } catch (e: any) {
+      Alert.alert("Erro", e?.response?.data?.error?.message ?? "Não foi possível registrar a ocorrência.");
+    }
+    setSavingOccurrence(false);
+  }, [lineId, occurrenceType, occurrenceNotes, currentLocation]);
+
   const distanceTo = (point: LinePoint): number | null => {
     if (!currentLocation || point.latitude == null || point.longitude == null) return null;
     return haversineDistance(
@@ -190,11 +225,16 @@ export default function LineOperationScreen() {
           <Text style={styles.headerTitle}>Operação da rota</Text>
           <Text style={styles.headerDate}>{TODAY}</Text>
         </View>
-        {status === "running" && (
-          <View style={styles.liveBadge}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>AO VIVO</Text>
-          </View>
+        {isRunning && (
+          <>
+            <View style={styles.liveBadge}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>AO VIVO</Text>
+            </View>
+            <Pressable style={styles.occBtn} onPress={() => setShowOccurrenceModal(true)}>
+              <Ionicons name="warning-outline" size={20} color={theme.colors.feedback.warning} />
+            </Pressable>
+          </>
         )}
       </View>
 
@@ -329,6 +369,51 @@ export default function LineOperationScreen() {
           </>
         ) : null}
       </ScrollView>
+
+      {/* Modal de ocorrência (RF23) */}
+      <Modal visible={showOccurrenceModal} animationType="slide" transparent onRequestClose={() => setShowOccurrenceModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Registrar ocorrência</Text>
+
+            <View style={styles.occTypeGrid}>
+              {OCCURRENCE_TYPES.map((t) => (
+                <Pressable
+                  key={t.key}
+                  style={[styles.occTypeBtn, occurrenceType === t.key && styles.occTypeBtnSelected]}
+                  onPress={() => setOccurrenceType(t.key)}
+                >
+                  <Ionicons name={t.icon as any} size={20} color={occurrenceType === t.key ? theme.colors.feedback.warning : theme.colors.text.muted} />
+                  <Text style={[styles.occTypeBtnText, occurrenceType === t.key && { color: theme.colors.feedback.warning, fontWeight: "700" }]}>
+                    {t.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <TextInput
+              style={styles.occNotesInput}
+              value={occurrenceNotes}
+              onChangeText={setOccurrenceNotes}
+              placeholder="Nota adicional (opcional)..."
+              placeholderTextColor={theme.colors.text.muted}
+              multiline
+            />
+
+            <View style={styles.modalActions}>
+              <Pressable style={styles.cancelBtn} onPress={() => setShowOccurrenceModal(false)}>
+                <Text style={styles.cancelBtnText}>Cancelar</Text>
+              </Pressable>
+              <Pressable style={[styles.saveBtn, savingOccurrence && { opacity: 0.6 }]} onPress={handleOccurrence} disabled={savingOccurrence}>
+                {savingOccurrence
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={styles.saveBtnText}>Registrar</Text>
+                }
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -380,4 +465,18 @@ const styles = StyleSheet.create({
   nearText: { fontSize: theme.font.xs, fontWeight: "700", color: theme.colors.feedback.success },
   checkinBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: theme.spacing.sm, backgroundColor: theme.colors.brand.navy, paddingVertical: theme.spacing.md, borderRadius: theme.radius.md },
   checkinBtnText: { color: theme.colors.text.inverse, fontSize: theme.font.sm, fontWeight: "700" },
+  occBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.feedback.warning + "20", alignItems: "center", justifyContent: "center" },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  modalCard: { backgroundColor: theme.colors.background.card, borderTopLeftRadius: theme.radius.xl, borderTopRightRadius: theme.radius.xl, padding: theme.spacing.xl, gap: theme.spacing.md },
+  modalTitle: { fontSize: theme.font.lg, fontWeight: "800", color: theme.colors.text.primary },
+  occTypeGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
+  occTypeBtn: { flex: 1, minWidth: "45%", flexDirection: "row", alignItems: "center", gap: theme.spacing.sm, padding: theme.spacing.md, borderRadius: theme.radius.md, borderWidth: 1.5, borderColor: theme.colors.border.default, backgroundColor: theme.colors.background.muted },
+  occTypeBtnSelected: { borderColor: theme.colors.feedback.warning, backgroundColor: theme.colors.feedback.warning + "15" },
+  occTypeBtnText: { fontSize: theme.font.sm, color: theme.colors.text.secondary },
+  occNotesInput: { borderWidth: 1.5, borderColor: theme.colors.border.default, borderRadius: theme.radius.md, padding: theme.spacing.md, fontSize: theme.font.md, color: theme.colors.text.primary, backgroundColor: theme.colors.background.screen, minHeight: 60, textAlignVertical: "top" },
+  modalActions: { flexDirection: "row", gap: theme.spacing.md },
+  cancelBtn: { flex: 1, paddingVertical: theme.spacing.md, borderRadius: theme.radius.pill, alignItems: "center", borderWidth: 1.5, borderColor: theme.colors.border.default },
+  cancelBtnText: { fontWeight: "700", color: theme.colors.text.secondary },
+  saveBtn: { flex: 1, paddingVertical: theme.spacing.md, borderRadius: theme.radius.pill, alignItems: "center", backgroundColor: theme.colors.feedback.warning },
+  saveBtnText: { fontWeight: "700", color: "#fff" },
 });

@@ -77,6 +77,9 @@ export const ApiEndpoints = {
   POST_RATING: `${API_URL}/api/v1/ratings`,
   GET_DRIVER_RATINGS: `${API_URL}/api/v1/ratings/driver/:driverId`,
   GET_MY_RATING: `${API_URL}/api/v1/ratings/me`,
+  // Occurrences (RF23)
+  POST_OCCURRENCE: `${API_URL}/api/v1/lines/:lineId/occurrences`,
+  GET_OCCURRENCES: `${API_URL}/api/v1/lines/:lineId/occurrences`,
   // Line points
   ADD_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points`,
   UPDATE_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points/:pointId`,

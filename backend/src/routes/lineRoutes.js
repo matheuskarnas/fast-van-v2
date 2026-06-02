@@ -1,6 +1,7 @@
 const express = require("express");
 const { requireAuth } = require("../middlewares/authMiddleware");
 const { createInvite, acceptInvite } = require("../services/inviteService");
+const { registerOccurrence, listOccurrences } = require("../services/occurrenceService");
 const {
   createLine,
   getLinesByDriver,
@@ -224,6 +225,38 @@ router.post("/invite/accept", requireAuth, async (req, res, next) => {
   } catch (error) {
     return next(error);
   }
+});
+
+// RF23: Registrar ocorrência
+router.post("/:lineId/occurrences", requireAuth, async (req, res, next) => {
+  try {
+    if (req.auth.role !== "DRIVER") {
+      return res.status(403).json({ success: false, error: { code: "FORBIDDEN_RESOURCE", message: "Somente motoristas podem registrar ocorrências" } });
+    }
+    const { lineId } = req.params;
+    const { type, notes, passengerId, latitude, longitude } = req.body || {};
+    const result = await registerOccurrence({ lineId, driverId: req.auth.id, passengerId, type, notes, latitude, longitude });
+    if (!result.success) {
+      return res.status(400).json({ success: false, error: { code: "OCCURRENCE_ERROR", message: result.error } });
+    }
+    return res.status(201).json(result);
+  } catch (e) { return next(e); }
+});
+
+// RF23: Listar ocorrências por data
+router.get("/:lineId/occurrences", requireAuth, async (req, res, next) => {
+  try {
+    if (req.auth.role !== "DRIVER") {
+      return res.status(403).json({ success: false, error: { code: "FORBIDDEN_RESOURCE", message: "Somente motoristas podem consultar ocorrências" } });
+    }
+    const { lineId } = req.params;
+    const date = req.query.date || new Date().toISOString().slice(0, 10);
+    const result = await listOccurrences(lineId, date);
+    if (!result.success) {
+      return res.status(400).json({ success: false, error: { code: "OCCURRENCE_ERROR", message: result.error } });
+    }
+    return res.status(200).json(result);
+  } catch (e) { return next(e); }
 });
 
 module.exports = router;
