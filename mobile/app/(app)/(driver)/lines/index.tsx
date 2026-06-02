@@ -86,14 +86,8 @@ export default function LinesListScreen() {
   );
 }
 
-function countPassengers(line: Line): number {
-  const ids = new Set<string>();
-  (line.points ?? []).forEach((p) => (p.passengers ?? []).forEach((id) => ids.add(id)));
-  return ids.size;
-}
-
 function LineCard({ line, onPress }: { line: Line; onPress: () => void }) {
-  const passengers = countPassengers(line);
+  const passengers = line.passengerCount ?? 0;
   const occupancyColor =
     passengers >= line.capacity
       ? theme.colors.feedback.error

@@ -300,14 +300,21 @@ async function removePickupDropoffPoint(lineId, pointId, driverId) {
 async function getLineById(lineId, driverId) {
   try {
     if (shouldUseDatabase()) {
-      const res = await query(`SELECT * FROM lines WHERE id = $1`, [lineId]);
+      const res = await query(
+        `SELECT l.*, COUNT(e.passenger_id)::int AS passenger_count
+         FROM lines l
+         LEFT JOIN line_enrollments e ON e.line_id = l.id
+         WHERE l.id = $1
+         GROUP BY l.id`,
+        [lineId],
+      );
       if (!res.rows[0]) return { success: false, error: "Linha não encontrada" };
       const row = res.rows[0];
       if (row.owner_driver_id !== driverId && row.driver_id !== driverId) {
         return { success: false, error: "Você não tem permissão para acessar esta linha" };
       }
       const points = await getPointsByLineId(lineId);
-      return { success: true, line: mapLineRowToDomain(row, points) };
+      return { success: true, line: { ...mapLineRowToDomain(row, points), passengerCount: row.passenger_count } };
     }
 
     let line = null;
@@ -327,13 +334,17 @@ async function getLinesByDriver(driverId) {
   try {
     if (shouldUseDatabase()) {
       const res = await query(
-        `SELECT * FROM lines WHERE owner_driver_id = $1 OR driver_id = $1 ORDER BY created_at DESC`,
+        `SELECT l.*, COUNT(e.passenger_id)::int AS passenger_count
+         FROM lines l
+         LEFT JOIN line_enrollments e ON e.line_id = l.id
+         WHERE l.owner_driver_id = $1 OR l.driver_id = $1
+         GROUP BY l.id ORDER BY l.created_at DESC`,
         [driverId],
       );
       const lines = await Promise.all(
         res.rows.map(async (row) => {
           const points = await getPointsByLineId(row.id);
-          return mapLineRowToDomain(row, points);
+          return { ...mapLineRowToDomain(row, points), passengerCount: row.passenger_count };
         }),
       );
       return { success: true, lines };

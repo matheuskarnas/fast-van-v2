@@ -1,22 +1,30 @@
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { View, Text, StyleSheet } from "react-native";
 import { useEffect, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getSession } from "../../../services/session";
 import { ActionCard } from "../../../components/common/ActionCard";
 import { theme } from "../../../constants/theme";
 
+const PENDING_INVITE_KEY = "pendingInviteToken";
+
 export default function PassengerHomeScreen() {
   const [name, setName] = useState("Passageiro");
+  const router = useRouter();
 
   useEffect(() => {
-    const loadSession = async () => {
+    const init = async () => {
       const session = await getSession();
-      if (session?.userName) {
-        setName(session.userName);
+      if (session?.userName) setName(session.userName);
+
+      // Redireciona para tela de convite se tiver token pendente pós-login
+      const pendingToken = await AsyncStorage.getItem(PENDING_INVITE_KEY);
+      if (pendingToken) {
+        await AsyncStorage.removeItem(PENDING_INVITE_KEY);
+        router.replace(`/invite/${pendingToken}`);
       }
     };
-
-    loadSession();
+    init();
   }, []);
 
   return (
@@ -29,8 +37,15 @@ export default function PassengerHomeScreen() {
 
       <Link href="/(app)/(passenger)/lines" asChild>
         <ActionCard
-          title="RF3 - Linhas e presença"
+          title="Minhas linhas"
           description="Consultar e confirmar presença nas próximas viagens."
+        />
+      </Link>
+
+      <Link href="/(app)/(passenger)/accept-invite" asChild>
+        <ActionCard
+          title="Entrar em uma linha"
+          description="Tem um código de convite do motorista? Cole aqui para entrar na linha."
         />
       </Link>
 

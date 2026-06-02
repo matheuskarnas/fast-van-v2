@@ -24,6 +24,7 @@ export interface Line {
   points: LinePoint[];
   ownerDriverId: string;
   driverId?: string;
+  passengerCount?: number;
 }
 
 export interface CreateLinePayload {

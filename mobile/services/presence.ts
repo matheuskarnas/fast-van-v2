@@ -9,6 +9,9 @@ export type PresenceStatus =
 
 export interface PresenceLineSummary {
   lineId: string;
+  name?: string;
+  originCity?: string;
+  destinationPlace?: string;
   nextDate?: string;
   status: PresenceStatus;
 }

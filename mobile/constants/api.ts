@@ -62,6 +62,7 @@ export const ApiEndpoints = {
   // Line invites
   CREATE_LINE_INVITE: `${API_URL}/api/v1/lines/:lineId/invite`,
   ACCEPT_LINE_INVITE: `${API_URL}/api/v1/lines/invite/accept`,
+  PREVIEW_INVITE: `${API_URL}/api/v1/lines/invite/:token/preview`,
 
   // Line points
   ADD_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points`,

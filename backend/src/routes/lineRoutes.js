@@ -148,6 +148,28 @@ router.delete("/:id/points/:pointId", requireAuth, async (req, res, next) => {
 
 // ===== Convites =====
 
+// Endpoint público — retorna detalhes da linha pelo token sem autenticação
+router.get("/invite/:token/preview", async (req, res, next) => {
+  try {
+    const result = await getInvite(req.params.token);
+    if (!result.success) {
+      return res.status(404).json({ success: false, error: { code: "INVITE_NOT_FOUND", message: result.error } });
+    }
+    const { query, shouldUseDatabase } = require("../config/database");
+    let line = null;
+    if (shouldUseDatabase()) {
+      const row = await query(`SELECT id, name, origin_city, destination_place, capacity FROM lines WHERE id = $1`, [result.invite.lineId]);
+      if (row.rows[0]) {
+        const r = row.rows[0];
+        line = { id: r.id, name: r.name, originCity: r.origin_city, destinationPlace: r.destination_place, capacity: r.capacity };
+      }
+    }
+    return res.status(200).json({ success: true, invite: { lineId: result.invite.lineId, expiresAt: result.invite.expiresAt, line } });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.post("/:lineId/invite", requireAuth, async (req, res, next) => {
   try {
     if (req.auth.role !== "DRIVER") {
