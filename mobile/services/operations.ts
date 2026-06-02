@@ -135,6 +135,43 @@ export async function createLineInvite(lineId: string) {
   }
 }
 
+export type VanDecision = "single_van" | "double_van_fleet" | "double_van_app";
+
+export interface VanDecisionRecord {
+  lineId: string;
+  driverId: string;
+  date: string;
+  decision: VanDecision;
+  vehicleId?: string | null;
+  notes?: string | null;
+}
+
+export async function postVanDecision(
+  lineId: string,
+  payload: { date: string; decision: VanDecision; vehicleId?: string | null },
+): Promise<{ success: boolean; decision?: VanDecisionRecord; error?: { code?: string; message?: string } }> {
+  try {
+    const url = ApiEndpoints.POST_VAN_DECISION.replace(":lineId", lineId);
+    const response = await apiService.post<{ success: boolean; decision: VanDecisionRecord }>(url, payload);
+    return response.data;
+  } catch (error: any) {
+    return { success: false, error: { code: error?.response?.data?.error?.code || "NETWORK_ERROR", message: error?.response?.data?.error?.message || "Não foi possível registrar a decisão." } };
+  }
+}
+
+export async function fetchVanDecision(
+  lineId: string,
+  date: string,
+): Promise<{ success: boolean; decision: VanDecisionRecord | null; error?: { code?: string; message?: string } }> {
+  try {
+    const url = `${ApiEndpoints.GET_VAN_DECISION.replace(":lineId", lineId)}?date=${encodeURIComponent(date)}`;
+    const response = await apiService.get<{ success: boolean; decision: VanDecisionRecord | null }>(url);
+    return response.data;
+  } catch (error: any) {
+    return { success: false, decision: null, error: { code: error?.response?.data?.error?.code || "NETWORK_ERROR", message: error?.response?.data?.error?.message || "Não foi possível consultar a decisão." } };
+  }
+}
+
 export async function acceptLineInvite(token: string) {
   try {
     const response = await apiService.post(ApiEndpoints.ACCEPT_LINE_INVITE, { token });

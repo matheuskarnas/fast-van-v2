@@ -59,6 +59,8 @@ export const ApiEndpoints = {
   // Operations dashboard (RF4/RF5)
   LIST_OPERATIONS_LINES: `${API_URL}/api/v1/operations/lines`,
   GET_OPERATIONS_DASHBOARD: `${API_URL}/api/v1/operations/lines/:lineId/dashboard`,
+  POST_VAN_DECISION: `${API_URL}/api/v1/operations/lines/:lineId/decision`,
+  GET_VAN_DECISION: `${API_URL}/api/v1/operations/lines/:lineId/decision`,
   // Line invites
   CREATE_LINE_INVITE: `${API_URL}/api/v1/lines/:lineId/invite`,
   ACCEPT_LINE_INVITE: `${API_URL}/api/v1/lines/invite/accept`,

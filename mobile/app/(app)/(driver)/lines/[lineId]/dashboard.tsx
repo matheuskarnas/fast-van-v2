@@ -15,11 +15,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { theme } from "../../../../../constants/theme";
 import {
   getOperationsDashboard,
+  postVanDecision,
+  fetchVanDecision,
   type OperationsDashboard,
   type SegmentOccupancy,
   type OperationsAlert,
   type RoutePoint,
   type SlotOccupancy,
+  type VanDecision,
+  type VanDecisionRecord,
 } from "../../../../../services/operations";
 
 function todayISO() {
@@ -98,6 +102,70 @@ function SegmentCard({ label, occupancy, capacity, alert }: SegmentCardProps) {
   );
 }
 
+const DECISION_OPTIONS: { value: VanDecision; label: string; icon: string; color: string }[] = [
+  { value: "single_van", label: "Usar 1 van", icon: "bus-outline", color: theme.colors.feedback.success },
+  { value: "double_van_fleet", label: "2ª van (frota)", icon: "car-outline", color: theme.colors.brand.navy },
+  { value: "double_van_app", label: "2ª van (Uber/99)", icon: "phone-portrait-outline", color: theme.colors.brand.orange },
+];
+
+function DecisionPanel({
+  totalConfirmed, capacity, current, saving, onDecide,
+}: {
+  totalConfirmed: number;
+  capacity: number;
+  current: VanDecisionRecord | null;
+  saving: boolean;
+  onDecide: (d: VanDecision) => void;
+}) {
+  const pct = Math.round((totalConfirmed / capacity) * 100);
+  const suggestion = pct >= 80 ? "double_van_fleet" : "single_van";
+
+  return (
+    <View style={styles.decisionCard}>
+      <View style={styles.decisionHeader}>
+        <Text style={styles.decisionTitle}>
+          {totalConfirmed}/{capacity} passageiros confirmados ({pct}%)
+        </Text>
+        {!current && (
+          <View style={[styles.suggestionBadge, { backgroundColor: (suggestion === "single_van" ? theme.colors.feedback.success : theme.colors.feedback.warning) + "20" }]}>
+            <Text style={[styles.suggestionText, { color: suggestion === "single_van" ? theme.colors.feedback.success : theme.colors.feedback.warning }]}>
+              {suggestion === "single_van" ? "Sugestão: 1 van" : "Sugestão: 2ª van"}
+            </Text>
+          </View>
+        )}
+        {current && (
+          <View style={[styles.suggestionBadge, { backgroundColor: theme.colors.feedback.success + "20" }]}>
+            <Ionicons name="checkmark-circle" size={13} color={theme.colors.feedback.success} />
+            <Text style={[styles.suggestionText, { color: theme.colors.feedback.success }]}>Decisão registrada</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.decisionOptions}>
+        {DECISION_OPTIONS.map((opt) => {
+          const selected = current?.decision === opt.value;
+          return (
+            <Pressable
+              key={opt.value}
+              style={[styles.decisionBtn, selected && { borderColor: opt.color, backgroundColor: opt.color + "15" }]}
+              onPress={() => !saving && onDecide(opt.value)}
+              disabled={saving}
+            >
+              {saving && selected
+                ? <ActivityIndicator size="small" color={opt.color} />
+                : <Ionicons name={opt.icon as any} size={18} color={selected ? opt.color : theme.colors.text.muted} />
+              }
+              <Text style={[styles.decisionBtnText, selected && { color: opt.color, fontWeight: "700" }]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export default function LineDashboardScreen() {
   const { lineId } = useLocalSearchParams<{ lineId: string }>();
   const router = useRouter();
@@ -105,23 +173,37 @@ export default function LineDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [decision, setDecision] = useState<VanDecisionRecord | null>(null);
+  const [savingDecision, setSavingDecision] = useState(false);
   const date = todayISO();
 
   const load = useCallback(async () => {
     if (!lineId) return;
     setError(null);
-    const result = await getOperationsDashboard(lineId, date);
-    if (result.success) {
-      setData(result as OperationsDashboard);
+    const [dashResult, decisionResult] = await Promise.all([
+      getOperationsDashboard(lineId, date),
+      fetchVanDecision(lineId, date),
+    ]);
+    if (dashResult.success) {
+      setData(dashResult as OperationsDashboard);
     } else {
-      const err = (result as any).error;
+      const err = (dashResult as any).error;
       setError(err?.message ?? "Não foi possível carregar o dashboard.");
     }
+    if (decisionResult.success) setDecision(decisionResult.decision);
     setLoading(false);
     setRefreshing(false);
   }, [lineId, date]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const handleDecision = useCallback(async (d: VanDecision) => {
+    if (!lineId) return;
+    setSavingDecision(true);
+    const res = await postVanDecision(lineId, { date, decision: d });
+    if (res.success && res.decision) setDecision(res.decision);
+    setSavingDecision(false);
+  }, [lineId, date]);
 
   const onRefresh = () => { setRefreshing(true); load(); };
 
@@ -220,6 +302,19 @@ export default function LineDashboardScreen() {
                 />
             }
 
+            {/* RF9: Painel de Decisão */}
+            <Text style={styles.sectionTitle}>Decisão do dia</Text>
+            <DecisionPanel
+              totalConfirmed={
+                data.slots?.departureSlots?.reduce((s, x) => s + x.confirmedCount, 0)
+                ?? data.occupancy.outbound.confirmedCount
+              }
+              capacity={data.capacity}
+              current={decision}
+              saving={savingDecision}
+              onDecide={handleDecision}
+            />
+
             {data.routePoints && data.routePoints.length > 0 && (
               <>
                 <Text style={styles.sectionTitle}>Rota do dia</Text>
@@ -315,4 +410,12 @@ const styles = StyleSheet.create({
   errorText: { fontSize: theme.font.md, color: theme.colors.text.secondary, textAlign: "center" },
   retryBtn: { paddingHorizontal: theme.spacing.xl, paddingVertical: theme.spacing.md, backgroundColor: theme.colors.brand.orange, borderRadius: theme.radius.pill },
   retryText: { color: theme.colors.text.inverse, fontWeight: "700" },
+  decisionCard: { backgroundColor: theme.colors.background.card, borderRadius: theme.radius.lg, padding: theme.spacing.lg, gap: theme.spacing.md, borderWidth: 1, borderColor: theme.colors.border.soft, ...theme.shadow.card },
+  decisionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: theme.spacing.sm },
+  decisionTitle: { fontSize: theme.font.sm, fontWeight: "700", color: theme.colors.text.primary, flex: 1 },
+  suggestionBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: theme.spacing.sm, paddingVertical: 4, borderRadius: theme.radius.pill },
+  suggestionText: { fontSize: theme.font.xs, fontWeight: "700" },
+  decisionOptions: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
+  decisionBtn: { flex: 1, minWidth: 90, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.sm, borderRadius: theme.radius.md, borderWidth: 1.5, borderColor: theme.colors.border.default, backgroundColor: theme.colors.background.muted },
+  decisionBtnText: { fontSize: theme.font.xs, fontWeight: "600", color: theme.colors.text.secondary },
 });
