@@ -5,34 +5,82 @@
 
 // Lazy require em createLine para evitar dependência circular com vehicleService
 
+const { query, shouldUseDatabase } = require("../config/database");
+
 let mockLines = [];
 let mockPointId = 0;
 let lineIdCounter = 0;
+
+function mapLineRowToDomain(row, points = []) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name || row.line_name || "",
+    vehicleId: row.vehicle_id,
+    originCity: row.origin_city,
+    destinationPlace: row.destination_place || row.destination_city || "",
+    ownerDriverId: row.owner_driver_id,
+    driverId: row.driver_id || null,
+    arrivalTimes: row.arrival_times || [],
+    departureTimes: row.departure_times || [],
+    capacity: row.capacity,
+    pickupDropoffPoints: points,
+    createdAt: row.created_at,
+  };
+}
+
+function mapPointRowToDomain(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    address: row.address,
+    type: row.type,
+    segment: row.segment,
+    passengers: row.passengers || [],
+    latitude: row.latitude ?? null,
+    longitude: row.longitude ?? null,
+    placeId: row.place_id ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+async function getPointsByLineId(lineId) {
+  if (!shouldUseDatabase()) return [];
+  const result = await query(
+    `SELECT id, line_id, address, type, segment, passengers, latitude, longitude, place_id, created_at
+     FROM line_points WHERE line_id = $1 ORDER BY created_at ASC`,
+    [lineId],
+  );
+  return result.rows.map(mapPointRowToDomain);
+}
 
 /**
  * Cria uma nova linha de transporte
  */
 async function createLine(lineData, ownerDriverId) {
   try {
+    if (!lineData.name || lineData.name.trim() === "") {
+      return { success: false, error: "Nome da linha é obrigatório" };
+    }
+
     if (!lineData.originCity || lineData.originCity.trim() === "") {
-      return {
-        success: false,
-        error: "Cidade de origem é obrigatória",
-      };
+      return { success: false, error: "Cidade de origem é obrigatória" };
     }
 
     if (!lineData.destinationPlace || lineData.destinationPlace.trim() === "") {
-      return {
-        success: false,
-        error: "Ponto de destino é obrigatório",
-      };
+      return { success: false, error: "Ponto de destino é obrigatório" };
     }
 
     if (!lineData.vehicleId) {
-      return {
-        success: false,
-        error: "Você deve cadastrar um veículo antes de criar uma linha",
-      };
+      return { success: false, error: "Você deve cadastrar um veículo antes de criar uma linha" };
+    }
+
+    if (!Array.isArray(lineData.arrivalTimes) || lineData.arrivalTimes.length === 0) {
+      return { success: false, error: "Informe pelo menos um horário de chegada" };
+    }
+
+    if (!Array.isArray(lineData.departureTimes) || lineData.departureTimes.length === 0) {
+      return { success: false, error: "Informe pelo menos um horário de saída" };
     }
 
     // Validar que o veículo pertence ao motorista dono
@@ -56,32 +104,45 @@ async function createLine(lineData, ownerDriverId) {
 
     const newLine = {
       id: `line-${++lineIdCounter}`,
+      name: lineData.name.trim(),
       vehicleId: lineData.vehicleId,
       originCity: lineData.originCity,
       destinationPlace: lineData.destinationPlace,
       ownerDriverId,
       driverId: lineData.driverId || null,
-      departureTime: lineData.departureTime || null,
-      arrivalTime: lineData.arrivalTime || null,
-      returnTime: lineData.returnTime || null,
+      arrivalTimes: lineData.arrivalTimes,
+      departureTimes: lineData.departureTimes,
       pickupDropoffPoints: [],
       capacity: vehicleCapacity,
       createdAt: new Date().toISOString(),
     };
 
-    if (process.env.USE_MOCK_DB === "true") {
+    if (shouldUseDatabase()) {
+      const id = `line_${Date.now()}`;
+      await query(
+        `INSERT INTO lines (id, name, line_name, owner_driver_id, driver_id, vehicle_id, origin_city, destination_place, destination_city, arrival_times, departure_times, capacity)
+         VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10)`,
+        [
+          id,
+          newLine.name,
+          ownerDriverId,
+          newLine.driverId,
+          newLine.vehicleId,
+          newLine.originCity,
+          newLine.destinationPlace,
+          JSON.stringify(newLine.arrivalTimes),
+          JSON.stringify(newLine.departureTimes),
+          vehicleCapacity,
+        ],
+      );
+      newLine.id = id;
+    } else if (process.env.USE_MOCK_DB === "true") {
       mockLines.push(newLine);
     }
 
-    return {
-      success: true,
-      line: newLine,
-    };
+    return { success: true, line: newLine };
   } catch (error) {
-    return {
-      success: false,
-      error: `Erro ao criar linha: ${error.message}`,
-    };
+    return { success: false, error: `Erro ao criar linha: ${error.message}` };
   }
 }
 
@@ -100,45 +161,53 @@ async function addPickupDropoffPoint(lineId, pointData, driverId) {
     }
 
     let line = null;
-    if (process.env.USE_MOCK_DB === "true") {
+    if (shouldUseDatabase()) {
+      const res = await query(`SELECT * FROM lines WHERE id = $1`, [lineId]);
+      if (res.rows[0]) line = mapLineRowToDomain(res.rows[0]);
+    } else if (process.env.USE_MOCK_DB === "true") {
       line = mockLines.find((l) => l.id === lineId);
     }
 
-    if (!line) {
-      return {
-        success: false,
-        error: "Linha não encontrada",
-      };
-    }
+    if (!line) return { success: false, error: "Linha não encontrada" };
 
     if (line.ownerDriverId !== driverId && line.driverId !== driverId) {
-      return {
-        success: false,
-        error: "Você não tem permissão para gerenciar esta linha",
-      };
+      return { success: false, error: "Você não tem permissão para gerenciar esta linha" };
     }
 
     const passengers = pointData.passengerId ? [pointData.passengerId] : [];
+
+    if (shouldUseDatabase()) {
+      const id = `point_${Date.now()}`;
+      const res = await query(
+        `INSERT INTO line_points (id, line_id, address, type, segment, passengers, latitude, longitude, place_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING id, address, type, segment, passengers, latitude, longitude, place_id, created_at`,
+        [
+          id, lineId,
+          pointData.address,
+          pointData.type || "pickup",
+          pointData.segment || "ida",
+          JSON.stringify(passengers),
+          pointData.latitude ?? null,
+          pointData.longitude ?? null,
+          pointData.placeId ?? null,
+        ],
+      );
+      return { success: true, point: mapPointRowToDomain(res.rows[0]) };
+    }
 
     const newPoint = {
       id: `point-${++mockPointId}`,
       address: pointData.address,
       type: pointData.type || "pickup",
+      segment: pointData.segment || "ida",
       passengers,
       createdAt: new Date().toISOString(),
     };
-
     line.pickupDropoffPoints.push(newPoint);
-
-    return {
-      success: true,
-      point: newPoint,
-    };
+    return { success: true, point: newPoint };
   } catch (error) {
-    return {
-      success: false,
-      error: `Erro ao adicionar ponto: ${error.message}`,
-    };
+    return { success: false, error: `Erro ao adicionar ponto: ${error.message}` };
   }
 }
 
@@ -147,45 +216,47 @@ async function addPickupDropoffPoint(lineId, pointData, driverId) {
  */
 async function updatePickupDropoffPoint(lineId, pointId, updateData, driverId) {
   try {
-    let line = null;
-    if (process.env.USE_MOCK_DB === "true") {
-      line = mockLines.find((l) => l.id === lineId);
-    }
-
-    if (!line) {
-      return { success: false, error: "Linha não encontrada" };
-    }
-
-    if (line.ownerDriverId !== driverId && line.driverId !== driverId) {
-      return { success: false, error: "Você não tem permissão para gerenciar esta linha" };
-    }
-
-    const point = line.pickupDropoffPoints.find((p) => p.id === pointId);
-
-    if (!point) {
-      return { success: false, error: "Ponto não encontrado" };
-    }
-
-    if (updateData.address !== undefined) {
-      if (!updateData.address || updateData.address.trim() === "") {
+    if (shouldUseDatabase()) {
+      const lineRes = await query(`SELECT owner_driver_id, driver_id FROM lines WHERE id = $1`, [lineId]);
+      if (!lineRes.rows[0]) return { success: false, error: "Linha não encontrada" };
+      const { owner_driver_id, driver_id } = lineRes.rows[0];
+      if (owner_driver_id !== driverId && driver_id !== driverId) {
+        return { success: false, error: "Você não tem permissão para gerenciar esta linha" };
+      }
+      if (updateData.address !== undefined && (!updateData.address || updateData.address.trim() === "")) {
         return { success: false, error: "Endereço é obrigatório para criar um ponto" };
       }
+      const fields = [];
+      const values = [];
+      let idx = 1;
+      if (updateData.address !== undefined) { fields.push(`address = $${idx++}`); values.push(updateData.address); }
+      if (updateData.type !== undefined) { fields.push(`type = $${idx++}`); values.push(updateData.type); }
+      if (updateData.segment !== undefined) { fields.push(`segment = $${idx++}`); values.push(updateData.segment); }
+      if (fields.length === 0) return { success: false, error: "Nenhum campo para atualizar" };
+      values.push(pointId);
+      const res = await query(
+        `UPDATE line_points SET ${fields.join(", ")} WHERE id = $${idx} RETURNING id, address, type, segment, passengers, created_at`,
+        values,
+      );
+      if (!res.rows[0]) return { success: false, error: "Ponto não encontrado" };
+      return { success: true, point: mapPointRowToDomain(res.rows[0]) };
+    }
+
+    let line = null;
+    if (process.env.USE_MOCK_DB === "true") line = mockLines.find((l) => l.id === lineId);
+    if (!line) return { success: false, error: "Linha não encontrada" };
+    if (line.ownerDriverId !== driverId && line.driverId !== driverId) return { success: false, error: "Você não tem permissão para gerenciar esta linha" };
+    const point = line.pickupDropoffPoints.find((p) => p.id === pointId);
+    if (!point) return { success: false, error: "Ponto não encontrado" };
+    if (updateData.address !== undefined) {
+      if (!updateData.address || updateData.address.trim() === "") return { success: false, error: "Endereço é obrigatório para criar um ponto" };
       point.address = updateData.address;
     }
-
-    if (updateData.type !== undefined) {
-      point.type = updateData.type;
-    }
-
-    return {
-      success: true,
-      point,
-    };
+    if (updateData.type !== undefined) point.type = updateData.type;
+    if (updateData.segment !== undefined) point.segment = updateData.segment;
+    return { success: true, point };
   } catch (error) {
-    return {
-      success: false,
-      error: `Erro ao atualizar ponto: ${error.message}`,
-    };
+    return { success: false, error: `Erro ao atualizar ponto: ${error.message}` };
   }
 }
 
@@ -195,45 +266,31 @@ async function updatePickupDropoffPoint(lineId, pointId, updateData, driverId) {
  */
 async function removePickupDropoffPoint(lineId, pointId, driverId) {
   try {
+    if (shouldUseDatabase()) {
+      const lineRes = await query(`SELECT owner_driver_id, driver_id FROM lines WHERE id = $1`, [lineId]);
+      if (!lineRes.rows[0]) return { success: false, error: "Linha não encontrada" };
+      const { owner_driver_id, driver_id } = lineRes.rows[0];
+      if (owner_driver_id !== driverId && driver_id !== driverId) return { success: false, error: "Você não tem permissão para gerenciar esta linha" };
+      const ptRes = await query(`SELECT id, passengers FROM line_points WHERE id = $1`, [pointId]);
+      if (!ptRes.rows[0]) return { success: false, error: "Ponto não encontrado" };
+      const passengers = ptRes.rows[0].passengers || [];
+      if (passengers.length > 0) return { success: false, error: "Remova os passageiros vinculados antes de deletar este ponto" };
+      await query(`DELETE FROM line_points WHERE id = $1`, [pointId]);
+      return { success: true, message: "Ponto removido com sucesso" };
+    }
+
     let line = null;
-    if (process.env.USE_MOCK_DB === "true") {
-      line = mockLines.find((l) => l.id === lineId);
-    }
-
-    if (!line) {
-      return { success: false, error: "Linha não encontrada" };
-    }
-
-    if (line.ownerDriverId !== driverId && line.driverId !== driverId) {
-      return { success: false, error: "Você não tem permissão para gerenciar esta linha" };
-    }
-
+    if (process.env.USE_MOCK_DB === "true") line = mockLines.find((l) => l.id === lineId);
+    if (!line) return { success: false, error: "Linha não encontrada" };
+    if (line.ownerDriverId !== driverId && line.driverId !== driverId) return { success: false, error: "Você não tem permissão para gerenciar esta linha" };
     const pointIndex = line.pickupDropoffPoints.findIndex((p) => p.id === pointId);
-
-    if (pointIndex === -1) {
-      return { success: false, error: "Ponto não encontrado" };
-    }
-
+    if (pointIndex === -1) return { success: false, error: "Ponto não encontrado" };
     const point = line.pickupDropoffPoints[pointIndex];
-
-    if (point.passengers && point.passengers.length > 0) {
-      return {
-        success: false,
-        error: "Remova os passageiros vinculados antes de deletar este ponto",
-      };
-    }
-
+    if (point.passengers && point.passengers.length > 0) return { success: false, error: "Remova os passageiros vinculados antes de deletar este ponto" };
     line.pickupDropoffPoints.splice(pointIndex, 1);
-
-    return {
-      success: true,
-      message: "Ponto removido com sucesso",
-    };
+    return { success: true, message: "Ponto removido com sucesso" };
   } catch (error) {
-    return {
-      success: false,
-      error: `Erro ao remover ponto: ${error.message}`,
-    };
+    return { success: false, error: `Erro ao remover ponto: ${error.message}` };
   }
 }
 
@@ -242,20 +299,21 @@ async function removePickupDropoffPoint(lineId, pointId, driverId) {
  */
 async function getLineById(lineId, driverId) {
   try {
+    if (shouldUseDatabase()) {
+      const res = await query(`SELECT * FROM lines WHERE id = $1`, [lineId]);
+      if (!res.rows[0]) return { success: false, error: "Linha não encontrada" };
+      const row = res.rows[0];
+      if (row.owner_driver_id !== driverId && row.driver_id !== driverId) {
+        return { success: false, error: "Você não tem permissão para acessar esta linha" };
+      }
+      const points = await getPointsByLineId(lineId);
+      return { success: true, line: mapLineRowToDomain(row, points) };
+    }
+
     let line = null;
-
-    if (process.env.USE_MOCK_DB === "true") {
-      line = mockLines.find((l) => l.id === lineId);
-    }
-
-    if (!line) {
-      return { success: false, error: "Linha não encontrada" };
-    }
-
-    if (line.ownerDriverId !== driverId && line.driverId !== driverId) {
-      return { success: false, error: "Você não tem permissão para acessar esta linha" };
-    }
-
+    if (process.env.USE_MOCK_DB === "true") line = mockLines.find((l) => l.id === lineId);
+    if (!line) return { success: false, error: "Linha não encontrada" };
+    if (line.ownerDriverId !== driverId && line.driverId !== driverId) return { success: false, error: "Você não tem permissão para acessar esta linha" };
     return { success: true, line };
   } catch (error) {
     return { success: false, error: `Erro ao buscar linha: ${error.message}` };
@@ -267,14 +325,24 @@ async function getLineById(lineId, driverId) {
  */
 async function getLinesByDriver(driverId) {
   try {
-    let lines = [];
-
-    if (process.env.USE_MOCK_DB === "true") {
-      lines = mockLines.filter(
-        (l) => l.ownerDriverId === driverId || l.driverId === driverId,
+    if (shouldUseDatabase()) {
+      const res = await query(
+        `SELECT * FROM lines WHERE owner_driver_id = $1 OR driver_id = $1 ORDER BY created_at DESC`,
+        [driverId],
       );
+      const lines = await Promise.all(
+        res.rows.map(async (row) => {
+          const points = await getPointsByLineId(row.id);
+          return mapLineRowToDomain(row, points);
+        }),
+      );
+      return { success: true, lines };
     }
 
+    let lines = [];
+    if (process.env.USE_MOCK_DB === "true") {
+      lines = mockLines.filter((l) => l.ownerDriverId === driverId || l.driverId === driverId);
+    }
     return { success: true, lines };
   } catch (error) {
     return { success: false, error: `Erro ao buscar linhas: ${error.message}` };
@@ -286,6 +354,14 @@ async function getLinesByDriver(driverId) {
  */
 async function hasActiveLineByVehicleId(vehicleId, driverId) {
   if (!vehicleId) return false;
+
+  if (shouldUseDatabase()) {
+    const res = await query(
+      `SELECT id FROM lines WHERE vehicle_id = $1 AND (owner_driver_id = $2 OR driver_id = $2) LIMIT 1`,
+      [vehicleId, driverId || ""],
+    );
+    return res.rows.length > 0;
+  }
 
   if (process.env.USE_MOCK_DB === "true") {
     return mockLines.some((line) => {

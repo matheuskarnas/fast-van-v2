@@ -53,8 +53,11 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
   };
 
   const validLineData = {
+    name: "Linha Manhã Fatec-SJC",
     originCity: "Caçapava",
     destinationPlace: "Fatec-SJC",
+    arrivalTimes: ["07:00", "08:00"],
+    departureTimes: ["11:00", "12:35"],
   };
 
   let driverOwnerId;
@@ -96,8 +99,11 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
       const lineResult = await createLine(
         {
           vehicleId,
+          name: validLineData.name,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
+          arrivalTimes: validLineData.arrivalTimes,
+          departureTimes: validLineData.departureTimes,
         },
         driverOwnerId,
       );
@@ -117,8 +123,11 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
       const lineResult = await createLine(
         {
           vehicleId,
+          name: validLineData.name,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
+          arrivalTimes: validLineData.arrivalTimes,
+          departureTimes: validLineData.departureTimes,
         },
         driverOwnerId,
       );
@@ -143,8 +152,11 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
       const lineResult = await createLine(
         {
           vehicleId,
+          name: validLineData.name,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
+          arrivalTimes: validLineData.arrivalTimes,
+          departureTimes: validLineData.departureTimes,
         },
         driverOwnerId,
       );
@@ -174,8 +186,11 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
       const lineResult = await createLine(
         {
           vehicleId,
+          name: validLineData.name,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
+          arrivalTimes: validLineData.arrivalTimes,
+          departureTimes: validLineData.departureTimes,
         },
         driverOwnerId,
       );
@@ -202,8 +217,11 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
       const lineResult = await createLine(
         {
           vehicleId,
+          name: validLineData.name,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
+          arrivalTimes: validLineData.arrivalTimes,
+          departureTimes: validLineData.departureTimes,
         },
         driverOwnerId,
       );
@@ -222,8 +240,11 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
       const lineResult = await createLine(
         {
           vehicleId,
+          name: validLineData.name,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
+          arrivalTimes: validLineData.arrivalTimes,
+          departureTimes: validLineData.departureTimes,
         },
         driverOwnerId,
       );
@@ -254,8 +275,11 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
       const lineResult = await createLine(
         {
           vehicleId,
+          name: validLineData.name,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
+          arrivalTimes: validLineData.arrivalTimes,
+          departureTimes: validLineData.departureTimes,
         },
         driverOwnerId,
       );
@@ -285,12 +309,12 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
 
     it("Cenário 2.17: deve listar múltiplas linhas do motorista", async () => {
       await createLine(
-        { vehicleId, originCity: "Caçapava", destinationPlace: "Fatec-SJC" },
+        { vehicleId, name: "Linha Manhã", originCity: "Caçapava", destinationPlace: "Fatec-SJC", arrivalTimes: ["07:00"], departureTimes: ["12:00"] },
         driverOwnerId,
       );
 
       await createLine(
-        { vehicleId, originCity: "Caçapava", destinationPlace: "Centro-SP" },
+        { vehicleId, name: "Linha Noturna", originCity: "Caçapava", destinationPlace: "Centro-SP", arrivalTimes: ["19:00"], departureTimes: ["23:00"] },
         driverOwnerId,
       );
 
@@ -322,8 +346,11 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
       const lineResult = await createLine(
         {
           vehicleId: null,
+          name: validLineData.name,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
+          arrivalTimes: validLineData.arrivalTimes,
+          departureTimes: validLineData.departureTimes,
         },
         newDriverId,
       );
@@ -334,7 +361,7 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
 
     it("Cenário 2.19: não pode criar linha sem origem e destino", async () => {
       const lineResult = await createLine(
-        { vehicleId, originCity: "", destinationPlace: "" },
+        { vehicleId, name: validLineData.name, originCity: "", destinationPlace: "", arrivalTimes: validLineData.arrivalTimes, departureTimes: validLineData.departureTimes },
         driverOwnerId,
       );
 
@@ -358,8 +385,11 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
       const lineResult = await createLine(
         {
           vehicleId,
+          name: validLineData.name,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
+          arrivalTimes: validLineData.arrivalTimes,
+          departureTimes: validLineData.departureTimes,
         },
         otherDriverId,
       );
@@ -372,8 +402,11 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
       const lineResult = await createLine(
         {
           vehicleId,
+          name: validLineData.name,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
+          arrivalTimes: validLineData.arrivalTimes,
+          departureTimes: validLineData.departureTimes,
         },
         driverOwnerId,
       );
@@ -394,8 +427,11 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
       const lineResult = await createLine(
         {
           vehicleId,
+          name: validLineData.name,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
+          arrivalTimes: validLineData.arrivalTimes,
+          departureTimes: validLineData.departureTimes,
         },
         driverOwnerId,
       );
@@ -424,8 +460,11 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
       const lineResult = await createLine(
         {
           vehicleId,
+          name: validLineData.name,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
+          arrivalTimes: validLineData.arrivalTimes,
+          departureTimes: validLineData.departureTimes,
         },
         driverOwnerId,
       );
@@ -442,8 +481,11 @@ describe("RF2: Cadastro e Gerenciamento de Rotas (Linhas)", () => {
       const lineResult = await createLine(
         {
           vehicleId,
+          name: validLineData.name,
           originCity: validLineData.originCity,
           destinationPlace: validLineData.destinationPlace,
+          arrivalTimes: validLineData.arrivalTimes,
+          departureTimes: validLineData.departureTimes,
         },
         driverOwnerId,
       );

@@ -37,7 +37,7 @@ describe("inviteService (mock)", () => {
 
   test("cria e aceita um invite com sucesso", async () => {
     const create = await lineService.createLine(
-      { originCity: "Cidade A", destinationPlace: "Destino B", vehicleId },
+      { name: "Linha Teste", originCity: "Cidade A", destinationPlace: "Destino B", vehicleId, arrivalTimes: ["07:00"], departureTimes: ["12:00"] },
       driverId,
     );
     expect(create.success).toBe(true);

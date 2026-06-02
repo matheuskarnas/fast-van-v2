@@ -171,8 +171,11 @@ describe("RF2: Cadastro de Veículos", () => {
     const lineResult = await createLine(
       {
         vehicleId: vehicleResult.vehicle.id,
+        name: "Linha Teste",
         originCity: "Caçapava",
         destinationPlace: "Fatec-SJC",
+        arrivalTimes: ["07:00"],
+        departureTimes: ["12:00"],
       },
       userResult.user.id,
     );

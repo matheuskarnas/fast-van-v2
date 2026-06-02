@@ -50,7 +50,7 @@ describe("Line Invite HTTP: Endpoints de Convite para Linhas", () => {
     });
 
     const lineRes = await lineService.createLine(
-      { originCity: "City A", destinationPlace: "Place B", vehicleId: vehicleResult.vehicle.id },
+      { name: "Linha Teste", originCity: "City A", destinationPlace: "Place B", vehicleId: vehicleResult.vehicle.id, arrivalTimes: ["07:00"], departureTimes: ["12:00"] },
       driverAuthId,
     );
 

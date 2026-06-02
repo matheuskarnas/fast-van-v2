@@ -3,6 +3,8 @@
  * Controla presença por data para passageiros vinculados às linhas.
  */
 
+const { query, shouldUseDatabase } = require("../config/database");
+
 const DEFAULT_STATUS = "vai e volta";
 const ALLOWED_STATUSES = [
   DEFAULT_STATUS,
@@ -146,45 +148,31 @@ async function createPresenceLine(lineData) {
 }
 
 async function addPassengerToLine(lineId, passengerId, boardingPointId) {
+  if (!passengerId) return { success: false, error: "Passageiro inválido" };
+
+  if (shouldUseDatabase()) {
+    const lineCheck = await query(`SELECT id FROM lines WHERE id = $1`, [lineId]);
+    if (!lineCheck.rows[0]) return { success: false, error: "Linha não encontrada" };
+    await query(
+      `INSERT INTO line_enrollments (id, line_id, passenger_id)
+       VALUES ($1, $2, $3) ON CONFLICT (line_id, passenger_id) DO NOTHING`,
+      [`enroll_${Date.now()}`, lineId, passengerId],
+    );
+    return { success: true };
+  }
+
   const line = getLine(lineId);
-
-  if (!line) {
-    return {
-      success: false,
-      error: "Linha não encontrada",
-    };
-  }
-
-  if (!passengerId) {
-    return {
-      success: false,
-      error: "Passageiro inválido",
-    };
-  }
+  if (!line) return { success: false, error: "Linha não encontrada" };
 
   if (boardingPointId) {
     const point = line.points.find((item) => item.id === boardingPointId);
-    if (!point) {
-      return {
-        success: false,
-        error: "Ponto de embarque não encontrado",
-      };
-    }
-
-    if (!point.passengers.includes(passengerId)) {
-      point.passengers.push(passengerId);
-    }
-
+    if (!point) return { success: false, error: "Ponto de embarque não encontrado" };
+    if (!point.passengers.includes(passengerId)) point.passengers.push(passengerId);
     line.passengerBoardingPointById[passengerId] = boardingPointId;
   }
 
-  if (!line.passengerIds.includes(passengerId)) {
-    line.passengerIds.push(passengerId);
-  }
-
-  return {
-    success: true,
-  };
+  if (!line.passengerIds.includes(passengerId)) line.passengerIds.push(passengerId);
+  return { success: true };
 }
 
 async function linkPassengerToPoint(lineId, passengerId, pointId) {
@@ -257,21 +245,24 @@ async function markPassengerPresence(
   status,
   options = {},
 ) {
-  const line = getLine(lineId);
-
   if (!options.isAuthenticated && options.isAuthenticated !== undefined) {
-    return {
-      success: false,
-      error: "Usuário não autenticado",
-    };
+    return { success: false, error: "Usuário não autenticado" };
   }
 
-  if (!line || !isPassengerActiveInLine(line, passengerId)) {
-    return {
-      success: false,
-      error: "Você não tem permissão para registrar presença nesta linha",
-    };
+  if (shouldUseDatabase()) {
+    const enrolled = await query(
+      `SELECT id FROM line_enrollments WHERE line_id = $1 AND passenger_id = $2`,
+      [lineId, passengerId],
+    );
+    if (!enrolled.rows[0]) return { success: false, error: "Você não tem permissão para registrar presença nesta linha" };
+  } else {
+    const line = getLine(lineId);
+    if (!line || !isPassengerActiveInLine(line, passengerId)) {
+      return { success: false, error: "Você não tem permissão para registrar presença nesta linha" };
+    }
   }
+
+  const line = shouldUseDatabase() ? null : getLine(lineId);
 
   if (!isValidDateString(date)) {
     return {
@@ -287,10 +278,10 @@ async function markPassengerPresence(
     };
   }
 
-  const boardingPointId = line.passengerBoardingPointById[passengerId];
-  const boardingPoint = line.points.find(
-    (point) => point.id === boardingPointId,
-  );
+  const boardingPoint = line ? (() => {
+    const boardingPointId = line.passengerBoardingPointById[passengerId];
+    return line.points.find((point) => point.id === boardingPointId);
+  })() : null;
 
   if (boardingPoint?.time) {
     const deadline = new Date(`${date}T${boardingPoint.time}:00`);
@@ -306,21 +297,20 @@ async function markPassengerPresence(
     }
   }
 
-  const key = getAttendanceKey(lineId, passengerId, date);
-  mockPresenceDb.attendanceByDate[key] = status;
+  if (shouldUseDatabase()) {
+    await query(
+      `INSERT INTO presence_records (id, line_id, passenger_id, date, status, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       ON CONFLICT (line_id, passenger_id, date) DO UPDATE SET status = $5, updated_at = NOW()`,
+      [`pr_${Date.now()}`, lineId, passengerId, date, status],
+    );
+  } else {
+    const key = getAttendanceKey(lineId, passengerId, date);
+    mockPresenceDb.attendanceByDate[key] = status;
+  }
 
-  notifyPresenceSubscribers({
-    type: "presence-updated",
-    lineId,
-    passengerId,
-    date,
-    status,
-  });
-
-  return {
-    success: true,
-    status,
-  };
+  notifyPresenceSubscribers({ type: "presence-updated", lineId, passengerId, date, status });
+  return { success: true, status };
 }
 
 async function getPassengerPresenceStatus(lineId, passengerId, date) {
@@ -365,6 +355,29 @@ async function listPassengerLinesByDate(passengerId, date) {
     };
   }
 
+  if (shouldUseDatabase()) {
+    const enrolled = await query(
+      `SELECT e.line_id, l.name, l.origin_city, l.destination_place,
+              COALESCE(p.status, $3) as status
+       FROM line_enrollments e
+       JOIN lines l ON l.id = e.line_id
+       LEFT JOIN presence_records p ON p.line_id = e.line_id AND p.passenger_id = e.passenger_id AND p.date = $2
+       WHERE e.passenger_id = $1`,
+      [passengerId, date, DEFAULT_STATUS],
+    );
+    return {
+      success: true,
+      lines: enrolled.rows.map((r) => ({
+        lineId: r.line_id,
+        name: r.name,
+        originCity: r.origin_city,
+        destinationPlace: r.destination_place,
+        nextDate: date,
+        status: r.status,
+      })),
+    };
+  }
+
   const lines = mockPresenceDb.lines
     .filter((line) => isPassengerActiveInLine(line, passengerId))
     .map((line) => ({
@@ -373,10 +386,7 @@ async function listPassengerLinesByDate(passengerId, date) {
       status: getStatusForDate(line.id, passengerId, date),
     }));
 
-  return {
-    success: true,
-    lines,
-  };
+  return { success: true, lines };
 }
 
 async function listDriverOperationalLines(driverId) {
@@ -384,6 +394,27 @@ async function listDriverOperationalLines(driverId) {
     return {
       success: false,
       error: "Motorista inválido",
+    };
+  }
+
+  if (shouldUseDatabase()) {
+    const res = await query(
+      `SELECT id, name, origin_city, destination_place, capacity, owner_driver_id, driver_id
+       FROM lines WHERE owner_driver_id = $1 OR driver_id = $1`,
+      [driverId],
+    );
+    return {
+      success: true,
+      lines: res.rows.map((r) => ({
+        lineId: r.id,
+        name: r.name,
+        originCity: r.origin_city,
+        destinationPlace: r.destination_place,
+        capacity: r.capacity,
+        ownerDriverId: r.owner_driver_id,
+        driverId: r.driver_id,
+        nextDate: new Date().toISOString().slice(0, 10),
+      })),
     };
   }
 
@@ -397,10 +428,7 @@ async function listDriverOperationalLines(driverId) {
       driverId: line.driverId,
     }));
 
-  return {
-    success: true,
-    lines,
-  };
+  return { success: true, lines };
 }
 
 async function getConfirmedPassengersBySegment(lineId, date, driverId) {
@@ -427,28 +455,29 @@ async function getConfirmedPassengersBySegment(lineId, date, driverId) {
     };
   }
 
+  if (shouldUseDatabase()) {
+    const enrolled = await query(
+      `SELECT e.passenger_id, COALESCE(p.status, $3) as status
+       FROM line_enrollments e
+       LEFT JOIN presence_records p ON p.line_id = e.line_id AND p.passenger_id = e.passenger_id AND p.date = $2
+       WHERE e.line_id = $1`,
+      [lineId, date, DEFAULT_STATUS],
+    );
+    const outbound = enrolled.rows.filter((r) => isConfirmedInOutbound(r.status)).map((r) => r.passenger_id);
+    const returnTrip = enrolled.rows.filter((r) => isConfirmedInReturn(r.status)).map((r) => r.passenger_id);
+    return { success: true, confirmed: { outbound, return: returnTrip } };
+  }
+
   const outbound = [];
   const returnTrip = [];
 
   line.passengerIds.forEach((passengerId) => {
     const status = getStatusForDate(lineId, passengerId, date);
-
-    if (isConfirmedInOutbound(status)) {
-      outbound.push(passengerId);
-    }
-
-    if (isConfirmedInReturn(status)) {
-      returnTrip.push(passengerId);
-    }
+    if (isConfirmedInOutbound(status)) outbound.push(passengerId);
+    if (isConfirmedInReturn(status)) returnTrip.push(passengerId);
   });
 
-  return {
-    success: true,
-    confirmed: {
-      outbound,
-      return: returnTrip,
-    },
-  };
+  return { success: true, confirmed: { outbound, return: returnTrip } };
 }
 
 async function buildDailyRoute(lineId, date) {

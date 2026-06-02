@@ -62,6 +62,11 @@ export const ApiEndpoints = {
   // Line invites
   CREATE_LINE_INVITE: `${API_URL}/api/v1/lines/:lineId/invite`,
   ACCEPT_LINE_INVITE: `${API_URL}/api/v1/lines/invite/accept`,
+
+  // Line points
+  ADD_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points`,
+  UPDATE_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points/:pointId`,
+  DELETE_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points/:pointId`,
 };
 
 export const API_TIMEOUT = 30000; // 30 seconds

@@ -39,6 +39,15 @@ export default function DriverLayout() {
         }}
       />
       <Tabs.Screen
+        name="lines"
+        options={{
+          title: "Linhas",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="map-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="earnings"
         options={{
           title: "Ganhos",
