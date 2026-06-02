@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -25,6 +25,41 @@ const TYPE_ICONS = {
   dropoff: "↓",
 };
 
+interface RouteInfo {
+  distanceM: number;
+  durationS: number;
+}
+
+async function fetchRouteInfo(waypoints: { latitude: number; longitude: number }[]): Promise<RouteInfo | null> {
+  if (waypoints.length < 2) return null;
+  const key = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!key) return null;
+  const origin = `${waypoints[0].latitude},${waypoints[0].longitude}`;
+  const destination = `${waypoints[waypoints.length - 1].latitude},${waypoints[waypoints.length - 1].longitude}`;
+  const mid = waypoints.slice(1, -1).map((p) => `${p.latitude},${p.longitude}`).join("|");
+  const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}${mid ? `&waypoints=${encodeURIComponent(mid)}` : ""}&key=${key}`;
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
+    if (json.status !== "OK" || !json.routes[0]) return null;
+    const legs = json.routes[0].legs as any[];
+    const distanceM = legs.reduce((s: number, l: any) => s + l.distance.value, 0);
+    const durationS = legs.reduce((s: number, l: any) => s + l.duration.value, 0);
+    return { distanceM, durationS };
+  } catch { return null; }
+}
+
+function formatDistance(m: number) {
+  return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`;
+}
+
+function formatDuration(s: number) {
+  const h = Math.floor(s / 3600);
+  const min = Math.round((s % 3600) / 60);
+  if (h > 0) return `${h}h ${min}min`;
+  return `${min} min`;
+}
+
 export default function LineMapScreen() {
   const { lineId } = useLocalSearchParams<{ lineId: string }>();
   const router = useRouter();
@@ -32,6 +67,9 @@ export default function LineMapScreen() {
   const [points, setPoints] = useState<LinePoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPoint, setSelectedPoint] = useState<LinePoint | null>(null);
+  const [idaRoute, setIdaRoute] = useState<RouteInfo | null>(null);
+  const [voltaRoute, setVoltaRoute] = useState<RouteInfo | null>(null);
+  const [calculatingRoute, setCalculatingRoute] = useState(false);
 
   const load = useCallback(async () => {
     if (!lineId) return;
@@ -59,6 +97,24 @@ export default function LineMapScreen() {
   }, [lineId]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // RF22: calcula rota após pontos carregados
+  useEffect(() => {
+    if (points.length < 2) return;
+    const calc = async () => {
+      setCalculatingRoute(true);
+      const idaPoints = points.filter((p) => p.segment === "ida").map((p) => ({ latitude: p.latitude!, longitude: p.longitude! }));
+      const voltaPoints = points.filter((p) => p.segment === "volta").map((p) => ({ latitude: p.latitude!, longitude: p.longitude! }));
+      const [ida, volta] = await Promise.all([
+        fetchRouteInfo(idaPoints),
+        fetchRouteInfo(voltaPoints),
+      ]);
+      setIdaRoute(ida);
+      setVoltaRoute(volta);
+      setCalculatingRoute(false);
+    };
+    calc();
+  }, [points]);
 
   const idaPoints = points.filter((p) => p.segment === "ida");
   const voltaPoints = points.filter((p) => p.segment === "volta");
@@ -164,6 +220,52 @@ export default function LineMapScreen() {
         </View>
       </View>
 
+      {/* RF22: Painel de distância e tempo */}
+      {(idaRoute || voltaRoute || calculatingRoute) && !selectedPoint && (
+        <View style={styles.routeInfoCard}>
+          {calculatingRoute ? (
+            <View style={styles.routeInfoRow}>
+              <ActivityIndicator size="small" color={theme.colors.brand.orange} />
+              <Text style={styles.routeInfoLabel}>Calculando rota...</Text>
+            </View>
+          ) : (
+            <>
+              {idaRoute && (
+                <View style={styles.routeInfoRow}>
+                  <View style={[styles.routeInfoDot, { backgroundColor: SEGMENT_COLORS.ida }]} />
+                  <Text style={styles.routeInfoLabel}>Ida</Text>
+                  <Text style={styles.routeInfoValue}>{formatDistance(idaRoute.distanceM)}</Text>
+                  <Text style={styles.routeInfoSep}>·</Text>
+                  <Text style={styles.routeInfoValue}>{formatDuration(idaRoute.durationS)}</Text>
+                </View>
+              )}
+              {voltaRoute && (
+                <View style={styles.routeInfoRow}>
+                  <View style={[styles.routeInfoDot, { backgroundColor: SEGMENT_COLORS.volta }]} />
+                  <Text style={styles.routeInfoLabel}>Volta</Text>
+                  <Text style={styles.routeInfoValue}>{formatDistance(voltaRoute.distanceM)}</Text>
+                  <Text style={styles.routeInfoSep}>·</Text>
+                  <Text style={styles.routeInfoValue}>{formatDuration(voltaRoute.durationS)}</Text>
+                </View>
+              )}
+              {idaRoute && voltaRoute && (
+                <View style={[styles.routeInfoRow, styles.routeInfoTotal]}>
+                  <Ionicons name="swap-vertical-outline" size={14} color={theme.colors.text.secondary} />
+                  <Text style={styles.routeInfoLabel}>Total</Text>
+                  <Text style={[styles.routeInfoValue, { fontWeight: "800" }]}>
+                    {formatDistance(idaRoute.distanceM + voltaRoute.distanceM)}
+                  </Text>
+                  <Text style={styles.routeInfoSep}>·</Text>
+                  <Text style={[styles.routeInfoValue, { fontWeight: "800" }]}>
+                    {formatDuration(idaRoute.durationS + voltaRoute.durationS)}
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
+        </View>
+      )}
+
       {/* Card do ponto selecionado */}
       {selectedPoint && (
         <View style={styles.pointCard}>
@@ -234,4 +336,21 @@ const styles = StyleSheet.create({
   pointTypeBadge: { paddingHorizontal: theme.spacing.sm, paddingVertical: 3, borderRadius: theme.radius.pill },
   pointTypeText: { fontSize: theme.font.xs, fontWeight: "700" },
   pointAddress: { fontSize: theme.font.md, fontWeight: "600", color: theme.colors.text.primary },
+  routeInfoCard: {
+    position: "absolute",
+    bottom: theme.spacing.xl,
+    left: theme.spacing.md,
+    right: theme.spacing.md,
+    backgroundColor: "rgba(255,255,255,0.97)",
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    gap: theme.spacing.xs,
+    ...theme.shadow.card,
+  },
+  routeInfoRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing.sm },
+  routeInfoTotal: { borderTopWidth: 1, borderTopColor: theme.colors.border.soft, paddingTop: theme.spacing.xs, marginTop: theme.spacing.xs },
+  routeInfoDot: { width: 10, height: 10, borderRadius: 5 },
+  routeInfoLabel: { fontSize: theme.font.sm, color: theme.colors.text.secondary, width: 36 },
+  routeInfoValue: { fontSize: theme.font.sm, color: theme.colors.text.primary, fontWeight: "600" },
+  routeInfoSep: { fontSize: theme.font.sm, color: theme.colors.text.muted },
 });
