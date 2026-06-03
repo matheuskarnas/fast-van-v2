@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { apiService } from "../../../../services/api";
 import { ApiEndpoints } from "../../../../constants/api";
 import { theme } from "../../../../constants/theme";
+import { getDriverLines, type Line } from "../../../../services/driverLines";
 
 interface Vehicle {
   id: string;
@@ -30,6 +31,7 @@ interface Vehicle {
 export default function VehiclesListScreen() {
   const router = useRouter();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [lines, setLines] = useState<Line[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -54,25 +56,14 @@ export default function VehiclesListScreen() {
 
   const loadVehicles = useCallback(async () => {
     try {
-      const response = await apiService.get<{
-        success: boolean;
-        vehicles: Vehicle[];
-      }>(ApiEndpoints.GET_VEHICLES);
-
-      if (response.data?.success) {
-        setVehicles(response.data.vehicles || []);
-      } else {
-        Alert.alert(
-          "Falha ao carregar veículos",
-          "Não foi possível carregar sua lista de veículos. Verifique sua conexão e tente novamente.",
-        );
-      }
-    } catch (error) {
-      console.error("Erro ao carregar veículos:", error);
-      Alert.alert(
-        "Falha ao carregar veículos",
-        "Não foi possível conectar ao servidor para buscar seus veículos. Tente novamente.",
-      );
+      const [vehicleRes, linesRes] = await Promise.all([
+        apiService.get<{ success: boolean; vehicles: Vehicle[] }>(ApiEndpoints.GET_VEHICLES),
+        getDriverLines(),
+      ]);
+      if (vehicleRes.data?.success) setVehicles(vehicleRes.data.vehicles || []);
+      if (linesRes.success) setLines(linesRes.lines ?? []);
+    } catch {
+      Alert.alert("Falha ao carregar veículos", "Verifique sua conexão e tente novamente.");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -109,7 +100,7 @@ export default function VehiclesListScreen() {
                 ApiEndpoints.UPDATE_VEHICLE.replace(":id", vehicleId),
               );
 
-              if (response.data?.success) {
+              if ((response.data as any)?.success) {
                 Alert.alert(
                   "Veículo excluído",
                   "O veículo foi removido com sucesso da sua conta.",
@@ -118,7 +109,7 @@ export default function VehiclesListScreen() {
                 return;
               }
 
-              const errorCode = response.data?.error?.code;
+              const errorCode = (response.data as any)?.error?.code;
               Alert.alert(
                 "Não foi possível excluir",
                 getVehicleDeleteErrorMessage(errorCode),
@@ -148,7 +139,10 @@ export default function VehiclesListScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Meus Veículos</Text>
+        <Text style={styles.title}>Minha Frota</Text>
+        <Text style={styles.fleetSummary}>
+          {vehicles.length} van{vehicles.length !== 1 ? "s" : ""} · {lines.length} linha{lines.length !== 1 ? "s" : ""} ativa{lines.length !== 1 ? "s" : ""}
+        </Text>
       </View>
 
       {vehicles.length === 0 ? (
@@ -167,30 +161,44 @@ export default function VehiclesListScreen() {
       ) : (
         <FlatList
           data={vehicles}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.vehicleCard}>
-              <View style={styles.vehicleInfo}>
-                <Text style={styles.vehiclePlate}>{item.plate}</Text>
-                <Text style={styles.vehicleDetails}>
-                  {item.brand} {item.model} • {item.year}
-                </Text>
-                <Text style={styles.vehicleCapacity}>
-                  Capacidade: {item.capacity} lugares
-                </Text>
+          keyExtractor={(item: Vehicle) => item.id}
+          renderItem={({ item }: { item: Vehicle }) => {
+            const associatedLines = lines.filter((l) => l.vehicleId === item.id);
+            return (
+              <View style={styles.vehicleCard}>
+                <View style={styles.vehicleInfo}>
+                  <Text style={styles.vehiclePlate}>{item.plate}</Text>
+                  <Text style={styles.vehicleDetails}>
+                    {item.brand} {item.model} • {item.year}
+                  </Text>
+                  <Text style={styles.vehicleCapacity}>
+                    Capacidade: {item.capacity} lugares
+                  </Text>
+                  {associatedLines.length > 0 ? (
+                    associatedLines.map((l) => (
+                      <View key={l.id} style={styles.lineBadge}>
+                        <Ionicons name="map-outline" size={12} color={theme.colors.brand.orange} />
+                        <Text style={styles.lineBadgeText} numberOfLines={1}>{l.name || l.originCity}</Text>
+                        <Text style={styles.linePax}>{l.passengerCount ?? 0} passageiros</Text>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.noLine}>Sem linha associada</Text>
+                  )}
+                </View>
+                <Pressable
+                  style={styles.deleteButton}
+                  onPress={() => handleDeleteVehicle(item.id)}
+                >
+                  <Ionicons
+                    name="trash-outline"
+                    size={20}
+                    color={theme.colors.feedback.error}
+                  />
+                </Pressable>
               </View>
-              <Pressable
-                style={styles.deleteButton}
-                onPress={() => handleDeleteVehicle(item.id)}
-              >
-                <Ionicons
-                  name="trash-outline"
-                  size={20}
-                  color={theme.colors.feedback.error}
-                />
-              </Pressable>
-            </View>
-          )}
+            );
+          }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
@@ -280,6 +288,39 @@ const styles = StyleSheet.create({
   vehicleCapacity: {
     fontSize: theme.font.sm,
     color: theme.colors.text.secondary,
+  },
+  fleetSummary: {
+    fontSize: theme.font.sm,
+    color: theme.colors.text.secondary,
+    marginTop: 2,
+  },
+  lineBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: theme.spacing.xs,
+    backgroundColor: theme.colors.brand.orange + "10",
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 3,
+    borderRadius: theme.radius.pill,
+    alignSelf: "flex-start",
+  },
+  lineBadgeText: {
+    fontSize: theme.font.xs,
+    fontWeight: "700",
+    color: theme.colors.brand.orange,
+    maxWidth: 150,
+  },
+  linePax: {
+    fontSize: theme.font.xs,
+    color: theme.colors.brand.orange,
+    opacity: 0.7,
+  },
+  noLine: {
+    fontSize: theme.font.xs,
+    color: theme.colors.text.muted,
+    marginTop: theme.spacing.xs,
+    fontStyle: "italic",
   },
   deleteButton: {
     padding: theme.spacing.md,
