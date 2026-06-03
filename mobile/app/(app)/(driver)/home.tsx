@@ -27,6 +27,13 @@ export default function DriverHomeScreen() {
         Acesse os fluxos de linha, geofencing e chat pelo painel abaixo.
       </Text>
 
+      <Link href={"/(app)/shared/marketplace-b2b" as any} asChild>
+        <ActionCard
+          title="Marketplace B2B"
+          description="Veja solicitações de transporte de empresas e entre em contato."
+        />
+      </Link>
+
       <Link href="/(app)/shared/maps" asChild>
         <ActionCard
           title="RF7 - Geofencing"

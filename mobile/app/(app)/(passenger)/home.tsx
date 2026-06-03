@@ -35,6 +35,13 @@ export default function PassengerHomeScreen() {
         Acompanhe linhas, chat privado e o chat do grupo da sua viagem.
       </Text>
 
+      <Link href={"/(app)/shared/marketplace-b2b" as any} asChild>
+        <ActionCard
+          title="Marketplace B2B"
+          description="Publique uma solicitação de transporte para sua empresa."
+        />
+      </Link>
+
       <Link href={"/(app)/(passenger)/dashboard" as any} asChild>
         <ActionCard
           title="Meu dashboard"

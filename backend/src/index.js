@@ -11,6 +11,7 @@ const operationsRoutes = require("./routes/operationsRoutes");
 const financeRoutes = require("./routes/financeRoutes");
 const ratingRoutes = require("./routes/ratingRoutes");
 const driverRoutes = require("./routes/driverRoutes");
+const marketplaceRoutes = require("./routes/marketplaceRoutes");
 const { testConnection, closePool } = require("./config/database");
 
 const app = express();
@@ -64,6 +65,7 @@ app.use("/api/v1/operations", operationsRoutes);
 app.use("/api/v1/finance", financeRoutes);
 app.use("/api/v1/ratings", ratingRoutes);
 app.use("/api/v1/driver", driverRoutes);
+app.use("/api/v1/marketplace", marketplaceRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

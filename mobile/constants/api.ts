@@ -58,6 +58,11 @@ export const ApiEndpoints = {
 
   // Driver Dashboard (RF15/30)
   GET_DRIVER_DASHBOARD: `${API_URL}/api/v1/driver/dashboard`,
+  // Marketplace B2B (RF10/11)
+  CREATE_B2B_REQUEST: `${API_URL}/api/v1/marketplace/b2b`,
+  LIST_B2B_REQUESTS: `${API_URL}/api/v1/marketplace/b2b`,
+  LIST_MY_B2B_REQUESTS: `${API_URL}/api/v1/marketplace/b2b/mine`,
+  UPDATE_B2B_REQUEST: `${API_URL}/api/v1/marketplace/b2b/:id`,
   // Geofencing
   CREATE_GEOFENCE_LINE: `${API_URL}/api/v1/geofencing/lines`,
   START_GEOFENCE_LINE: `${API_URL}/api/v1/geofencing/lines/:lineId/start`,
