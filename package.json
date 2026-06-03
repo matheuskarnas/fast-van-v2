@@ -36,9 +36,5 @@
     "node.js"
   ],
   "author": "",
-  "license": "MIT",
-  "workspaces": [
-    "backend",
-    "mobile"
-  ]
+  "license": "MIT"
 }
