@@ -85,6 +85,11 @@ export const ApiEndpoints = {
   GET_OCCURRENCES: `${API_URL}/api/v1/lines/:lineId/occurrences`,
   // No-show (RF25)
   POST_NO_SHOW: `${API_URL}/api/v1/lines/:lineId/no-show`,
+  // Point suggestions (RF19/20)
+  POST_SUGGESTION: `${API_URL}/api/v1/lines/:lineId/point-suggestions`,
+  GET_SUGGESTIONS: `${API_URL}/api/v1/lines/:lineId/point-suggestions`,
+  GET_MY_SUGGESTIONS: `${API_URL}/api/v1/lines/:lineId/point-suggestions/me`,
+  DECIDE_SUGGESTION: `${API_URL}/api/v1/lines/:lineId/point-suggestions/:suggId`,
   // Line points
   ADD_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points`,
   UPDATE_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points/:pointId`,

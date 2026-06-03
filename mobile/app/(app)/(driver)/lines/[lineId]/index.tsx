@@ -143,6 +143,10 @@ export default function LineDetailsScreen() {
                 <Ionicons name="map-outline" size={20} color={theme.colors.feedback.success} />
                 <Text style={[styles.actionText, { color: theme.colors.feedback.success }]}>Mapa</Text>
               </Pressable>
+              <Pressable style={styles.actionButton} onPress={() => router.push(`/lines/${lineId}/suggestions`)}>
+                <Ionicons name="git-pull-request-outline" size={20} color={theme.colors.feedback.warning} />
+                <Text style={[styles.actionText, { color: theme.colors.feedback.warning }]}>Sugestões</Text>
+              </Pressable>
               <Pressable style={styles.actionButton} onPress={() => router.push(`/lines/${lineId}/operation`)}>
                 <Ionicons name="play-circle-outline" size={20} color={theme.colors.brand.navy} />
                 <Text style={[styles.actionText, { color: theme.colors.brand.navy }]}>Operar</Text>

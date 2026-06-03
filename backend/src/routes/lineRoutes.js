@@ -3,6 +3,7 @@ const { requireAuth } = require("../middlewares/authMiddleware");
 const { createInvite, acceptInvite } = require("../services/inviteService");
 const { registerOccurrence, listOccurrences } = require("../services/occurrenceService");
 const { registerNoShow } = require("../services/noShowService");
+const { createSuggestion, listPendingSuggestions, listMySuggestions, decideSuggestion } = require("../services/pointSuggestionService");
 const {
   createLine,
   getLinesByDriver,
@@ -277,6 +278,71 @@ router.post("/:lineId/no-show", requireAuth, async (req, res, next) => {
       return res.status(status).json({ success: false, error: { code: "NO_SHOW_ERROR", message: result.error } });
     }
     return res.status(201).json(result);
+  } catch (e) { return next(e); }
+});
+
+// RF19: Sugerir ponto (PASSENGER matriculado)
+router.post("/:lineId/point-suggestions", requireAuth, async (req, res, next) => {
+  try {
+    if (req.auth.role !== "PASSENGER") {
+      return res.status(403).json({ success: false, error: { code: "FORBIDDEN_RESOURCE", message: "Somente passageiros podem sugerir pontos" } });
+    }
+    const { lineId } = req.params;
+
+    // Verifica matrícula
+    const { shouldUseDatabase, query: dbQuery } = require("../config/database");
+    if (shouldUseDatabase()) {
+      const e = await dbQuery(`SELECT 1 FROM line_enrollments WHERE line_id=$1 AND passenger_id=$2`, [lineId, req.auth.id]);
+      if (!e.rows[0]) return res.status(403).json({ success: false, error: { code: "FORBIDDEN_RESOURCE", message: "Você não está matriculado nesta linha" } });
+    } else {
+      const { listPassengerLinesByDate } = require("../services/presenceService");
+      const today = new Date().toISOString().slice(0, 10);
+      const lines = await listPassengerLinesByDate(req.auth.id, today);
+      if (!lines.success || !(lines.lines ?? []).some((l) => l.lineId === lineId)) {
+        return res.status(403).json({ success: false, error: { code: "FORBIDDEN_RESOURCE", message: "Você não está matriculado nesta linha" } });
+      }
+    }
+
+    const { address, type, segment, latitude, longitude, placeId } = req.body || {};
+    const result = await createSuggestion({ lineId, passengerId: req.auth.id, address, type, segment, latitude, longitude, placeId });
+    if (!result.success) return res.status(400).json({ success: false, error: { code: "SUGGESTION_ERROR", message: result.error } });
+    return res.status(201).json(result);
+  } catch (e) { return next(e); }
+});
+
+// RF19: Listar sugestões pendentes da linha (DRIVER)
+router.get("/:lineId/point-suggestions", requireAuth, async (req, res, next) => {
+  try {
+    if (req.auth.role !== "DRIVER") {
+      return res.status(403).json({ success: false, error: { code: "FORBIDDEN_RESOURCE", message: "Somente motoristas podem listar sugestões" } });
+    }
+    const result = await listPendingSuggestions(req.params.lineId);
+    return res.status(200).json(result);
+  } catch (e) { return next(e); }
+});
+
+// RF20: Minhas sugestões (PASSENGER)
+router.get("/:lineId/point-suggestions/me", requireAuth, async (req, res, next) => {
+  try {
+    if (req.auth.role !== "PASSENGER") {
+      return res.status(403).json({ success: false, error: { code: "FORBIDDEN_RESOURCE", message: "Somente passageiros podem consultar suas sugestões" } });
+    }
+    const result = await listMySuggestions(req.params.lineId, req.auth.id);
+    return res.status(200).json(result);
+  } catch (e) { return next(e); }
+});
+
+// RF19: Aprovar/rejeitar sugestão (DRIVER dono)
+router.patch("/:lineId/point-suggestions/:suggId", requireAuth, async (req, res, next) => {
+  try {
+    if (req.auth.role !== "DRIVER") {
+      return res.status(403).json({ success: false, error: { code: "FORBIDDEN_RESOURCE", message: "Somente motoristas podem decidir sobre sugestões" } });
+    }
+    const { suggId } = req.params;
+    const { decision, rejectionReason } = req.body || {};
+    const result = await decideSuggestion(suggId, req.auth.id, decision, rejectionReason);
+    if (!result.success) return res.status(400).json({ success: false, error: { code: "SUGGESTION_ERROR", message: result.error } });
+    return res.status(200).json(result);
   } catch (e) { return next(e); }
 });
 

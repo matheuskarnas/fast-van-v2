@@ -231,14 +231,23 @@ export default function PassengerDashboardScreen() {
                 )}
               </View>
             )}
-            {/* Botão avaliar */}
-            <Pressable
-              style={styles.rateBtn}
-              onPress={() => (router as any).push({ pathname: "/(app)/(passenger)/rate", params: { lineId: line.lineId, lineName: line.name } })}
-            >
-              <Ionicons name="star-outline" size={13} color={theme.colors.brand.orange} />
-              <Text style={styles.rateBtnText}>Avaliar</Text>
-            </Pressable>
+            {/* Ações rápidas */}
+            <View style={styles.quickActions}>
+              <Pressable
+                style={styles.rateBtn}
+                onPress={() => (router as any).push({ pathname: "/(app)/(passenger)/rate", params: { lineId: line.lineId, lineName: line.name } })}
+              >
+                <Ionicons name="star-outline" size={13} color={theme.colors.brand.orange} />
+                <Text style={styles.rateBtnText}>Avaliar</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.rateBtn, { borderColor: theme.colors.brand.navy + "60", backgroundColor: theme.colors.brand.navy + "10" }]}
+                onPress={() => (router as any).push({ pathname: "/(app)/(passenger)/suggest-point", params: { lineId: line.lineId, lineName: line.name } })}
+              >
+                <Ionicons name="add-circle-outline" size={13} color={theme.colors.brand.navy} />
+                <Text style={[styles.rateBtnText, { color: theme.colors.brand.navy }]}>Sugerir ponto</Text>
+              </Pressable>
+            </View>
 
             {/* Status real de pagamento */}
             {(() => {
@@ -358,6 +367,7 @@ const styles = StyleSheet.create({
   historyLine: { flex: 1, fontSize: theme.font.sm, color: theme.colors.text.primary },
   historyBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: theme.spacing.sm, paddingVertical: 3, borderRadius: theme.radius.pill },
   historyBadgeText: { fontSize: theme.font.xs, fontWeight: "700" },
-  rateBtn: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", paddingHorizontal: theme.spacing.sm, paddingVertical: 4, borderRadius: theme.radius.pill, borderWidth: 1, borderColor: theme.colors.brand.orange + "60", backgroundColor: theme.colors.brand.orange + "10" },
+  quickActions: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
+  rateBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: theme.spacing.sm, paddingVertical: 4, borderRadius: theme.radius.pill, borderWidth: 1, borderColor: theme.colors.brand.orange + "60", backgroundColor: theme.colors.brand.orange + "10" },
   rateBtnText: { fontSize: theme.font.xs, fontWeight: "700", color: theme.colors.brand.orange },
 });
