@@ -37,6 +37,9 @@ export const ApiEndpoints = {
   GET_MY_PRESENCE_LINES: `${API_URL}/api/v1/presence/me/lines`,
   UPDATE_MY_PRESENCE_STATUS: `${API_URL}/api/v1/presence/lines/:lineId/me/status`,
   GET_MY_SUMMARY: `${API_URL}/api/v1/presence/me/summary`,
+  // RF6: Troca de slot
+  POST_SLOT_REQUEST: `${API_URL}/api/v1/presence/lines/:lineId/me/slot-request`,
+  DELETE_SLOT_REQUEST: `${API_URL}/api/v1/presence/lines/:lineId/me/slot-request`,
 
   // Chat
   CREATE_PRIVATE_CONVERSATION: `${API_URL}/api/v1/chat/private/conversations`,

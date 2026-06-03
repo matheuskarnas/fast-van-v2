@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -18,6 +19,8 @@ import {
   type PresenceLineSummary,
   type PresenceStatus,
 } from "../../../services/presence";
+import { apiService } from "../../../services/api";
+import { ApiEndpoints } from "../../../constants/api";
 
 const STATUS_OPTIONS: { label: string; value: PresenceStatus; icon: string }[] = [
   { label: "Vou e volto", value: "vai e volta", icon: "checkmark-circle" },
@@ -52,6 +55,10 @@ export default function PassengerLinesScreen() {
   const [lines, setLines] = useState<PresenceLineSummary[]>([]);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // RF6: Modal de troca de slot
+  const [slotModalLine, setSlotModalLine] = useState<PresenceLineSummary | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<string>("");
+  const [savingSlot, setSavingSlot] = useState(false);
 
   const targetDate = useMemo(() => {
     const d = new Date();
@@ -107,6 +114,34 @@ export default function PassengerLinesScreen() {
     doUpdate(lineId, status);
   }, [doUpdate]);
 
+  const handleSlotRequest = useCallback(async () => {
+    if (!slotModalLine || !selectedSlot) return;
+    setSavingSlot(true);
+    try {
+      // Busca linha do backend para obter arrivalTimes
+      const url = ApiEndpoints.POST_SLOT_REQUEST.replace(":lineId", slotModalLine.lineId);
+      const res = await apiService.post<{ success: boolean; slotStatus?: string; error?: any }>(url, {
+        date: targetDate,
+        requestedDepartureTime: selectedSlot,
+        requestedArrivalTime: slotModalLine.arrivalTime ?? selectedSlot,
+      });
+      if ((res.data as any).success) {
+        const status = (res.data as any).slotStatus;
+        const msg = status === "switched"
+          ? "Troca confirmada! Você está no horário " + selectedSlot + " amanhã."
+          : "Você entrou na fila de espera para o horário " + selectedSlot + ". Será avisado se houver vaga.";
+        Alert.alert(status === "switched" ? "Troca confirmada!" : "Fila de espera", msg);
+        setSlotModalLine(null);
+        load();
+      } else {
+        Alert.alert("Erro", (res.data as any).error?.message ?? "Não foi possível solicitar a troca.");
+      }
+    } catch (e: any) {
+      Alert.alert("Erro", e?.response?.data?.error?.message ?? "Falha ao solicitar troca.");
+    }
+    setSavingSlot(false);
+  }, [slotModalLine, selectedSlot, targetDate, load]);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -151,10 +186,45 @@ export default function PassengerLinesScreen() {
               line={item}
               saving={savingId === item.lineId}
               onUpdate={(status) => handleUpdate(item.lineId, status, item.status)}
+              onSlotRequest={() => { setSlotModalLine(item); setSelectedSlot(item.departureTime ?? ""); }}
             />
           )}
         />
       )}
+
+      {/* RF6: Modal de troca de slot */}
+      <Modal visible={!!slotModalLine} animationType="slide" transparent onRequestClose={() => setSlotModalLine(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Trocar horário amanhã</Text>
+            <Text style={styles.modalSub}>Seu horário fixo: {slotModalLine?.departureTime ?? "—"} • Selecione um horário alternativo:</Text>
+            <View style={styles.slotPickerRow}>
+              {/* Placeholder: slots disponíveis viriam do backend */}
+              {["07:10", "08:00"].filter((s) => s !== slotModalLine?.departureTime).map((s) => (
+                <Pressable
+                  key={s}
+                  style={[styles.slotChip, selectedSlot === s && styles.slotChipSelected]}
+                  onPress={() => setSelectedSlot(s)}
+                >
+                  <Text style={[styles.slotChipText, selectedSlot === s && styles.slotChipTextSelected]}>{s}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <View style={styles.modalActions}>
+              <Pressable style={styles.modalCancelBtn} onPress={() => setSlotModalLine(null)}>
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalConfirmBtn, (!selectedSlot || savingSlot) && { opacity: 0.6 }]}
+                onPress={handleSlotRequest}
+                disabled={!selectedSlot || savingSlot}
+              >
+                {savingSlot ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalConfirmText}>Solicitar</Text>}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -163,10 +233,12 @@ function LinePresenceCard({
   line,
   saving,
   onUpdate,
+  onSlotRequest,
 }: {
   line: PresenceLineSummary;
   saving: boolean;
   onUpdate: (status: PresenceStatus) => void;
+  onSlotRequest: () => void;
 }) {
   const statusColor = STATUS_COLORS[line.status] ?? theme.colors.text.secondary;
   const currentOption = STATUS_OPTIONS.find((o) => o.value === line.status);
@@ -225,6 +297,14 @@ function LinePresenceCard({
             </View>
           )}
         </View>
+      )}
+
+      {/* RF6: Botão de troca de horário */}
+      {line.departureTime && (
+        <Pressable style={styles.slotSwapBtn} onPress={onSlotRequest}>
+          <Ionicons name="swap-horizontal-outline" size={13} color={theme.colors.brand.navy} />
+          <Text style={styles.slotSwapText}>Trocar horário amanhã</Text>
+        </Pressable>
       )}
 
       {/* Opções de presença */}
@@ -328,6 +408,22 @@ const styles = StyleSheet.create({
     maxWidth: 120,
   },
   statusBadgeText: { fontSize: theme.font.xs, fontWeight: "700" },
+  slotSwapBtn: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", paddingHorizontal: theme.spacing.sm, paddingVertical: 4, borderRadius: theme.radius.pill, borderWidth: 1, borderColor: theme.colors.brand.navy + "50", backgroundColor: theme.colors.brand.navy + "08" },
+  slotSwapText: { fontSize: theme.font.xs, fontWeight: "700", color: theme.colors.brand.navy },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  modalCard: { backgroundColor: theme.colors.background.card, borderTopLeftRadius: theme.radius.xl, borderTopRightRadius: theme.radius.xl, padding: theme.spacing.xl, gap: theme.spacing.md },
+  modalTitle: { fontSize: theme.font.lg, fontWeight: "800", color: theme.colors.text.primary },
+  modalSub: { fontSize: theme.font.sm, color: theme.colors.text.secondary },
+  slotPickerRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
+  slotChip: { paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.sm, borderRadius: theme.radius.pill, borderWidth: 1.5, borderColor: theme.colors.border.default, backgroundColor: theme.colors.background.screen },
+  slotChipSelected: { borderColor: theme.colors.brand.orange, backgroundColor: theme.colors.brand.orange + "15" },
+  slotChipText: { fontSize: theme.font.md, fontWeight: "600", color: theme.colors.text.secondary },
+  slotChipTextSelected: { color: theme.colors.brand.orange, fontWeight: "800" },
+  modalActions: { flexDirection: "row", gap: theme.spacing.md },
+  modalCancelBtn: { flex: 1, paddingVertical: theme.spacing.md, borderRadius: theme.radius.pill, alignItems: "center", borderWidth: 1.5, borderColor: theme.colors.border.default },
+  modalCancelText: { fontWeight: "700", color: theme.colors.text.secondary },
+  modalConfirmBtn: { flex: 1, paddingVertical: theme.spacing.md, borderRadius: theme.radius.pill, alignItems: "center", backgroundColor: theme.colors.brand.orange },
+  modalConfirmText: { fontWeight: "700", color: "#fff" },
   slotRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
   slotBadge: {
     flexDirection: "row",

@@ -18,6 +18,26 @@ let mockPresenceDb = {
   attendanceByDate: {},
 };
 
+// RF6: armazena slots dos passageiros no mock
+let mockEnrollmentSlots = {};
+
+function getEnrollmentSlot(lineId, passengerId) {
+  return mockEnrollmentSlots[`${lineId}::${passengerId}`] || null;
+}
+
+function countMockSlotEnrollments(lineId, departureTime, date, excludePassengerId) {
+  return Object.entries(mockEnrollmentSlots)
+    .filter(([key, slot]) => {
+      if (!key.startsWith(`${lineId}::`)) return false;
+      if (slot.departureTime !== departureTime) return false;
+      const pid = key.split("::")[1];
+      if (pid === excludePassengerId) return false;
+      const status = getStatusForDate(lineId, pid, date);
+      return status === DEFAULT_STATUS || status === "só vou e não volto";
+    })
+    .length;
+}
+
 const presenceSubscribers = new Set();
 
 function isValidDateString(date) {
@@ -147,7 +167,7 @@ async function createPresenceLine(lineData) {
   };
 }
 
-async function addPassengerToLine(lineId, passengerId, boardingPointId) {
+async function addPassengerToLine(lineId, passengerId, boardingPointId, options = {}) {
   if (!passengerId) return { success: false, error: "Passageiro inválido" };
 
   if (shouldUseDatabase()) {
@@ -172,6 +192,9 @@ async function addPassengerToLine(lineId, passengerId, boardingPointId) {
   }
 
   if (!line.passengerIds.includes(passengerId)) line.passengerIds.push(passengerId);
+  if (options?.departureTime) {
+    mockEnrollmentSlots[`${lineId}::${passengerId}`] = { departureTime: options.departureTime, arrivalTime: options.arrivalTime };
+  }
   return { success: true };
 }
 
@@ -574,7 +597,7 @@ async function clearPresenceDatabase() {
     lines: [],
     attendanceByDate: {},
   };
-
+  mockEnrollmentSlots = {};
   presenceSubscribers.clear();
 }
 
@@ -719,6 +742,8 @@ module.exports = {
   getPresenceLineById,
   getPresenceStatusForDate,
   getPassengerSummary,
+  getEnrollmentSlot,
+  countMockSlotEnrollments,
   subscribeToPresenceChanges,
   clearPresenceDatabase,
 };

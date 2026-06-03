@@ -5,6 +5,7 @@ const {
   listPassengerLinesByDate,
   getPassengerSummary,
 } = require("../services/presenceService");
+const { requestSlotChange, cancelSlotRequest } = require("../services/slotRequestService");
 
 const router = express.Router();
 
@@ -123,6 +124,35 @@ router.get("/me/summary", requireAuth, async (req, res, next) => {
   } catch (error) {
     return next(error);
   }
+});
+
+// RF6: Solicitar troca de slot para o dia
+router.post("/lines/:lineId/me/slot-request", requireAuth, async (req, res, next) => {
+  try {
+    if (req.auth.role !== "PASSENGER") {
+      return res.status(403).json({ success: false, error: { code: "FORBIDDEN_RESOURCE", message: "Somente passageiros podem solicitar troca de slot" } });
+    }
+    const { lineId } = req.params;
+    const { date, requestedDepartureTime, requestedArrivalTime } = req.body || {};
+    const result = await requestSlotChange({ lineId, passengerId: req.auth.id, date, requestedDepartureTime, requestedArrivalTime });
+    if (!result.success) {
+      return res.status(400).json({ success: false, error: { code: "SLOT_REQUEST_ERROR", message: result.error } });
+    }
+    return res.status(200).json(result);
+  } catch (e) { return next(e); }
+});
+
+// RF6: Cancelar troca de slot
+router.delete("/lines/:lineId/me/slot-request", requireAuth, async (req, res, next) => {
+  try {
+    if (req.auth.role !== "PASSENGER") {
+      return res.status(403).json({ success: false, error: { code: "FORBIDDEN_RESOURCE", message: "Somente passageiros podem cancelar troca de slot" } });
+    }
+    const { lineId } = req.params;
+    const { date } = req.query;
+    const result = await cancelSlotRequest(lineId, req.auth.id, date);
+    return res.status(200).json(result);
+  } catch (e) { return next(e); }
 });
 
 module.exports = router;
