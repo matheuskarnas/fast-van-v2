@@ -2,6 +2,7 @@ const express = require("express");
 const { requireAuth } = require("../middlewares/authMiddleware");
 const { createInvite, acceptInvite } = require("../services/inviteService");
 const { registerOccurrence, listOccurrences } = require("../services/occurrenceService");
+const { registerNoShow } = require("../services/noShowService");
 const {
   createLine,
   getLinesByDriver,
@@ -256,6 +257,26 @@ router.get("/:lineId/occurrences", requireAuth, async (req, res, next) => {
       return res.status(400).json({ success: false, error: { code: "OCCURRENCE_ERROR", message: result.error } });
     }
     return res.status(200).json(result);
+  } catch (e) { return next(e); }
+});
+
+// RF25: Registrar passageiro não embarcou
+router.post("/:lineId/no-show", requireAuth, async (req, res, next) => {
+  try {
+    if (req.auth.role !== "DRIVER") {
+      return res.status(403).json({ success: false, error: { code: "FORBIDDEN_RESOURCE", message: "Somente motoristas podem registrar no-show" } });
+    }
+    const { lineId } = req.params;
+    const { passengerId, segment, date, latitude, longitude } = req.body || {};
+    if (!passengerId) {
+      return res.status(400).json({ success: false, error: { code: "INVALID_PAYLOAD", message: "passengerId é obrigatório" } });
+    }
+    const result = await registerNoShow({ lineId, driverId: req.auth.id, passengerId, segment, date, latitude, longitude });
+    if (!result.success) {
+      const status = result.error?.includes("não confirmado") ? 422 : 400;
+      return res.status(status).json({ success: false, error: { code: "NO_SHOW_ERROR", message: result.error } });
+    }
+    return res.status(201).json(result);
   } catch (e) { return next(e); }
 });
 

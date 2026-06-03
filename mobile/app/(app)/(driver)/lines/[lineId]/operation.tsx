@@ -72,6 +72,9 @@ export default function LineOperationScreen() {
   const [occurrenceType, setOccurrenceType] = useState<string>("slow_traffic");
   const [occurrenceNotes, setOccurrenceNotes] = useState("");
   const [savingOccurrence, setSavingOccurrence] = useState(false);
+  // RF25: passageiros confirmados (carregados da API de presença)
+  const [confirmedPassengers, setConfirmedPassengers] = useState<{ passengerId: string; name?: string; status: string }[]>([]);
+  const [noShowDone, setNoShowDone] = useState<Set<string>>(new Set());
 
   const loadLine = useCallback(async () => {
     if (!lineId) return;
@@ -165,6 +168,24 @@ export default function LineOperationScreen() {
       setStatus("running");
     }
   };
+
+  const handleNoShow = useCallback(async (passengerId: string, segment: string) => {
+    if (!lineId) return;
+    try {
+      const url = ApiEndpoints.POST_NO_SHOW.replace(":lineId", lineId);
+      await apiService.post(url, {
+        passengerId,
+        segment,
+        date: TODAY,
+        latitude: currentLocation?.latitude ?? null,
+        longitude: currentLocation?.longitude ?? null,
+      });
+      setNoShowDone((prev) => new Set([...prev, passengerId]));
+      Alert.alert("Registrado", "Passageiro marcado como não embarcou.");
+    } catch (e: any) {
+      Alert.alert("Erro", e?.response?.data?.error?.message ?? "Não foi possível registrar.");
+    }
+  }, [lineId, currentLocation]);
 
   const handleOccurrence = useCallback(async () => {
     if (!lineId) return;
@@ -347,19 +368,50 @@ export default function LineOperationScreen() {
                       </View>
 
                       {isNext && !done && (
-                        <Pressable
-                          style={[styles.checkinBtn, isCheckingIn && styles.btnDisabled]}
-                          onPress={() => handleCheckIn(p)}
-                          disabled={isCheckingIn}
-                        >
-                          {isCheckingIn
-                            ? <ActivityIndicator size="small" color={theme.colors.text.inverse} />
-                            : <>
-                                <Ionicons name="location" size={16} color={theme.colors.text.inverse} />
-                                <Text style={styles.checkinBtnText}>Registrar chegada</Text>
-                              </>
-                          }
-                        </Pressable>
+                        <>
+                          {/* RF25: passageiros confirmados neste ponto */}
+                          {(p.passengers ?? []).length > 0 && (
+                            <View style={styles.passengersSection}>
+                              <Text style={styles.passengersSectionTitle}>Passageiros esperados</Text>
+                              {(p.passengers ?? []).map((pid: string) => {
+                                const alreadyNoShow = noShowDone.has(pid);
+                                return (
+                                  <View key={pid} style={styles.passengerRow}>
+                                    <Ionicons
+                                      name={alreadyNoShow ? "close-circle" : "person-outline"}
+                                      size={16}
+                                      color={alreadyNoShow ? theme.colors.feedback.error : theme.colors.text.secondary}
+                                    />
+                                    <Text style={[styles.passengerName, alreadyNoShow && { color: theme.colors.feedback.error, textDecorationLine: "line-through" }]}>
+                                      {pid}
+                                    </Text>
+                                    {!alreadyNoShow && (
+                                      <Pressable
+                                        style={styles.noShowBtn}
+                                        onPress={() => handleNoShow(pid, p.segment ?? "ida")}
+                                      >
+                                        <Text style={styles.noShowBtnText}>Não embarcou</Text>
+                                      </Pressable>
+                                    )}
+                                  </View>
+                                );
+                              })}
+                            </View>
+                          )}
+                          <Pressable
+                            style={[styles.checkinBtn, isCheckingIn && styles.btnDisabled]}
+                            onPress={() => handleCheckIn(p)}
+                            disabled={isCheckingIn}
+                          >
+                            {isCheckingIn
+                              ? <ActivityIndicator size="small" color={theme.colors.text.inverse} />
+                              : <>
+                                  <Ionicons name="location" size={16} color={theme.colors.text.inverse} />
+                                  <Text style={styles.checkinBtnText}>Registrar chegada</Text>
+                                </>
+                            }
+                          </Pressable>
+                        </>
                       )}
                     </View>
                   );
@@ -465,6 +517,12 @@ const styles = StyleSheet.create({
   nearText: { fontSize: theme.font.xs, fontWeight: "700", color: theme.colors.feedback.success },
   checkinBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: theme.spacing.sm, backgroundColor: theme.colors.brand.navy, paddingVertical: theme.spacing.md, borderRadius: theme.radius.md },
   checkinBtnText: { color: theme.colors.text.inverse, fontSize: theme.font.sm, fontWeight: "700" },
+  passengersSection: { gap: theme.spacing.sm, paddingVertical: theme.spacing.sm, borderTopWidth: 1, borderTopColor: theme.colors.border.soft },
+  passengersSectionTitle: { fontSize: theme.font.xs, fontWeight: "700", color: theme.colors.text.secondary, textTransform: "uppercase", letterSpacing: 0.5 },
+  passengerRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing.sm },
+  passengerName: { flex: 1, fontSize: theme.font.sm, color: theme.colors.text.secondary },
+  noShowBtn: { paddingHorizontal: theme.spacing.sm, paddingVertical: 4, borderRadius: theme.radius.pill, borderWidth: 1, borderColor: theme.colors.feedback.error + "60", backgroundColor: theme.colors.feedback.error + "10" },
+  noShowBtnText: { fontSize: theme.font.xs, fontWeight: "700", color: theme.colors.feedback.error },
   occBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.feedback.warning + "20", alignItems: "center", justifyContent: "center" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   modalCard: { backgroundColor: theme.colors.background.card, borderTopLeftRadius: theme.radius.xl, borderTopRightRadius: theme.radius.xl, padding: theme.spacing.xl, gap: theme.spacing.md },

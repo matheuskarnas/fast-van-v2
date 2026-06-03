@@ -80,6 +80,8 @@ export const ApiEndpoints = {
   // Occurrences (RF23)
   POST_OCCURRENCE: `${API_URL}/api/v1/lines/:lineId/occurrences`,
   GET_OCCURRENCES: `${API_URL}/api/v1/lines/:lineId/occurrences`,
+  // No-show (RF25)
+  POST_NO_SHOW: `${API_URL}/api/v1/lines/:lineId/no-show`,
   // Line points
   ADD_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points`,
   UPDATE_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points/:pointId`,
