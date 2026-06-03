@@ -10,6 +10,7 @@ const presenceRoutes = require("./routes/presenceRoutes");
 const operationsRoutes = require("./routes/operationsRoutes");
 const financeRoutes = require("./routes/financeRoutes");
 const ratingRoutes = require("./routes/ratingRoutes");
+const driverRoutes = require("./routes/driverRoutes");
 const { testConnection, closePool } = require("./config/database");
 
 const app = express();
@@ -62,6 +63,7 @@ app.use("/api/v1/presence", presenceRoutes);
 app.use("/api/v1/operations", operationsRoutes);
 app.use("/api/v1/finance", financeRoutes);
 app.use("/api/v1/ratings", ratingRoutes);
+app.use("/api/v1/driver", driverRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

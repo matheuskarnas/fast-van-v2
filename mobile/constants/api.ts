@@ -56,6 +56,8 @@ export const ApiEndpoints = {
   VOTE_POLL: `${API_URL}/api/v1/chat/groups/:lineId/polls/:pollId/vote`,
   GET_POLL: `${API_URL}/api/v1/chat/groups/:lineId/polls/:pollId`,
 
+  // Driver Dashboard (RF15/30)
+  GET_DRIVER_DASHBOARD: `${API_URL}/api/v1/driver/dashboard`,
   // Geofencing
   CREATE_GEOFENCE_LINE: `${API_URL}/api/v1/geofencing/lines`,
   START_GEOFENCE_LINE: `${API_URL}/api/v1/geofencing/lines/:lineId/start`,
