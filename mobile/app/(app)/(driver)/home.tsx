@@ -27,6 +27,13 @@ export default function DriverHomeScreen() {
         Acesse os fluxos de linha, geofencing e chat pelo painel abaixo.
       </Text>
 
+      <Link href={"/(app)/shared/marketplace-events" as any} asChild>
+        <ActionCard
+          title="Eventos esporádicos"
+          description="Veja demandas de transporte para shows, jogos e eventos."
+        />
+      </Link>
+
       <Link href={"/(app)/shared/marketplace-b2b" as any} asChild>
         <ActionCard
           title="Marketplace B2B"
