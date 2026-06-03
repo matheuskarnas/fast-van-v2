@@ -12,6 +12,9 @@ const {
   addUserToGroupChat,
   removeUserFromGroupChat,
   subscribeToGroupConversation,
+  createPoll,
+  votePoll,
+  getPoll,
 } = require("../services/chatService");
 
 const router = express.Router();
@@ -324,6 +327,43 @@ router.get("/groups/:lineId/stream", requireAuth, async (req, res, next) => {
   } catch (error) {
     return next(error);
   }
+});
+
+// RF29: Criar enquete no grupo
+router.post("/groups/:lineId/polls", requireAuth, async (req, res, next) => {
+  try {
+    const { lineId } = req.params;
+    const { question, options } = req.body || {};
+    const result = await createPoll(lineId, req.auth.id, question, options);
+    if (!result.success) {
+      const status = result.error?.includes("motorista") ? 403 : 400;
+      return res.status(status).json({ success: false, error: { message: result.error } });
+    }
+    return res.status(201).json(result);
+  } catch (e) { return next(e); }
+});
+
+// RF29: Votar em enquete
+router.post("/groups/:lineId/polls/:pollId/vote", requireAuth, async (req, res, next) => {
+  try {
+    const { lineId, pollId } = req.params;
+    const { optionId } = req.body || {};
+    const result = await votePoll(lineId, pollId, optionId, req.auth.id);
+    if (!result.success) {
+      return res.status(400).json({ success: false, error: { message: result.error } });
+    }
+    return res.status(200).json(result);
+  } catch (e) { return next(e); }
+});
+
+// RF29: Buscar enquete
+router.get("/groups/:lineId/polls/:pollId", requireAuth, async (req, res, next) => {
+  try {
+    const { lineId, pollId } = req.params;
+    const result = await getPoll(lineId, pollId);
+    if (!result.success) return res.status(404).json({ success: false, error: { message: result.error } });
+    return res.status(200).json(result);
+  } catch (e) { return next(e); }
 });
 
 module.exports = router;

@@ -49,6 +49,9 @@ export const ApiEndpoints = {
   SEND_GROUP_MESSAGE: `${API_URL}/api/v1/chat/groups/:lineId/messages`,
   GROUP_CHAT_MEMBERS: `${API_URL}/api/v1/chat/groups/:lineId/members`,
   GROUP_CHAT_STREAM: `${API_URL}/api/v1/chat/groups/:lineId/stream`,
+  CREATE_POLL: `${API_URL}/api/v1/chat/groups/:lineId/polls`,
+  VOTE_POLL: `${API_URL}/api/v1/chat/groups/:lineId/polls/:pollId/vote`,
+  GET_POLL: `${API_URL}/api/v1/chat/groups/:lineId/polls/:pollId`,
 
   // Geofencing
   CREATE_GEOFENCE_LINE: `${API_URL}/api/v1/geofencing/lines`,

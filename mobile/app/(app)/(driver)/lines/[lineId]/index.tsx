@@ -124,6 +124,10 @@ export default function LineDetailsScreen() {
             </View>
 
             <View style={styles.actionsRow}>
+              <Pressable style={styles.actionButton} onPress={() => (router as any).push({ pathname: "/(app)/shared/chat-group", params: { lineId, lineName: line.name } })}>
+                <Ionicons name="chatbubbles-outline" size={20} color={theme.colors.brand.navy} />
+                <Text style={[styles.actionText, { color: theme.colors.brand.navy }]}>Grupo</Text>
+              </Pressable>
               <Pressable style={styles.actionButton} onPress={handleGenerateInvite} disabled={sharing}>
                 {sharing
                   ? <ActivityIndicator size="small" color={theme.colors.brand.orange} />

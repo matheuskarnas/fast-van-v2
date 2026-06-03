@@ -1,7 +1,10 @@
 /**
- * Serviço de Chat (RF13)
+ * Serviço de Chat (RF13) + RF29 (Enquetes)
  * Suporta chat privado no marketplace e chat em grupo da linha com entrega realtime.
+ * Membership do grupo = line_enrollments (automático).
  */
+
+const { query, shouldUseDatabase } = require("../config/database");
 
 let privateConversations = [];
 let groupChats = [];
@@ -288,6 +291,7 @@ async function createLineGroupChat(payload) {
     ownerDriverId,
     memberRoles,
     messages: [],
+    polls: [],
     createdAt: new Date().toISOString(),
   };
 
@@ -307,25 +311,76 @@ function canManageGroup(group, actorId) {
   return group.memberRoles[actorId] === "DRIVER";
 }
 
+// RF29/RF13: verifica acesso via line_enrollments (DB path)
+async function canAccessGroupDB(lineId, userId) {
+  const res = await query(
+    `SELECT 1 FROM line_enrollments WHERE line_id = $1 AND passenger_id = $2
+     UNION
+     SELECT 1 FROM lines WHERE id = $1 AND (owner_driver_id = $2 OR driver_id = $2)
+     LIMIT 1`,
+    [lineId, userId],
+  );
+  return res.rows.length > 0;
+}
+
+async function isDriverOfLineDB(lineId, userId) {
+  const res = await query(
+    `SELECT 1 FROM lines WHERE id = $1 AND (owner_driver_id = $2 OR driver_id = $2) LIMIT 1`,
+    [lineId, userId],
+  );
+  return res.rows.length > 0;
+}
+
+// Auto-cria grupo em memória a partir dos membros da linha (DB ou mock)
+async function getOrCreateGroup(lineId, ownerDriverId) {
+  const existing = findGroupChat(lineId);
+  if (existing) return existing;
+
+  let memberRoles = {};
+  if (ownerDriverId) memberRoles[ownerDriverId] = "DRIVER";
+
+  if (shouldUseDatabase()) {
+    const res = await query(
+      `SELECT l.owner_driver_id, l.driver_id, e.passenger_id
+       FROM lines l LEFT JOIN line_enrollments e ON e.line_id = l.id
+       WHERE l.id = $1`,
+      [lineId],
+    );
+    if (!res.rows[0]) return null;
+    const r0 = res.rows[0];
+    memberRoles[r0.owner_driver_id] = "DRIVER";
+    if (r0.driver_id) memberRoles[r0.driver_id] = "DRIVER";
+    res.rows.forEach((r) => { if (r.passenger_id) memberRoles[r.passenger_id] = "PASSENGER"; });
+  }
+
+  const group = {
+    lineId,
+    ownerDriverId: ownerDriverId || Object.keys(memberRoles).find((k) => memberRoles[k] === "DRIVER"),
+    memberRoles,
+    messages: [],
+    polls: [],
+    createdAt: new Date().toISOString(),
+  };
+  groupChats.push(group);
+  return group;
+}
+
 async function sendGroupMessage(payload) {
   const { lineId, senderId, text, isAuthenticated } = payload || {};
 
   const authError = ensureAuthenticated(isAuthenticated);
   if (authError) return authError;
 
-  const group = findGroupChat(lineId);
+  let group = await getOrCreateGroup(lineId, null);
   if (!group) {
-    return {
-      success: false,
-      error: "Grupo não encontrado",
-    };
+    return { success: false, error: "Grupo não encontrado" };
   }
 
-  if (!canAccessGroup(group, senderId)) {
-    return {
-      success: false,
-      error: "Você não tem permissão para enviar neste grupo",
-    };
+  const hasAccess = canAccessGroup(group, senderId)
+    || (shouldUseDatabase() && await canAccessGroupDB(lineId, senderId));
+
+  if (!hasAccess) {
+    return { success: false, error: "Você não tem permissão para enviar neste grupo" };
   }
 
   if (isBlankMessage(text)) {
@@ -361,19 +416,16 @@ async function getGroupMessages(payload) {
   const authError = ensureAuthenticated(isAuthenticated);
   if (authError) return authError;
 
-  const group = findGroupChat(lineId);
+  let group = await getOrCreateGroup(lineId, null);
   if (!group) {
-    return {
-      success: false,
-      error: "Grupo não encontrado",
-    };
+    return { success: false, error: "Grupo não encontrado" };
   }
 
-  if (!canAccessGroup(group, userId)) {
-    return {
-      success: false,
-      error: "Você não tem permissão para acessar este grupo",
-    };
+  const hasAccess = canAccessGroup(group, userId)
+    || (shouldUseDatabase() && await canAccessGroupDB(lineId, userId));
+
+  if (!hasAccess) {
+    return { success: false, error: "Você não tem permissão para acessar este grupo" };
   }
 
   let readReceiptUpdated = false;
@@ -394,6 +446,7 @@ async function getGroupMessages(payload) {
   return {
     success: true,
     messages: [...group.messages],
+    polls: group.polls ? [...group.polls] : [],
     readReceiptUpdated,
   };
 }
@@ -470,6 +523,86 @@ function subscribeToGroupConversation(lineId, userId, callback) {
   };
 }
 
+// RF29 — Enquetes
+async function createPoll(lineId, creatorId, question, options) {
+  if (!question || !question.trim()) return { success: false, error: "Pergunta é obrigatória" };
+  if (!Array.isArray(options) || options.length < 2 || options.length > 4) {
+    return { success: false, error: "Informe entre 2 e 4 opções" };
+  }
+
+  let group = await getOrCreateGroup(lineId, null);
+  if (!group) return { success: false, error: "Grupo não encontrado" };
+
+  const isDriver = shouldUseDatabase()
+    ? await isDriverOfLineDB(lineId, creatorId)
+    : group.memberRoles[creatorId] === "DRIVER";
+  if (!isDriver) return { success: false, error: "Somente o motorista pode criar enquetes" };
+
+  if (!group.polls) group.polls = [];
+
+  const poll = {
+    id: `poll_${Date.now()}`,
+    lineId,
+    creatorId,
+    question: question.trim(),
+    options: options.map((text, i) => ({ id: `opt_${i}`, text: String(text).trim(), votes: [] })),
+    createdAt: new Date().toISOString(),
+    closed: false,
+  };
+  group.polls.push(poll);
+
+  // Publica como mensagem especial no grupo
+  const pollMessage = {
+    id: nextMessageId(),
+    senderId: creatorId,
+    type: "poll",
+    pollId: poll.id,
+    text: `📊 Enquete: ${poll.question}`,
+    status: "delivered",
+    readBy: [creatorId],
+    timestamp: new Date().toISOString(),
+  };
+  group.messages.push(pollMessage);
+  const allowedUsers = Object.keys(group.memberRoles);
+  notifyGroupConversation(lineId, pollMessage, allowedUsers);
+
+  return { success: true, poll };
+}
+
+async function votePoll(lineId, pollId, optionId, userId) {
+  let group = await getOrCreateGroup(lineId, null);
+  if (!group) return { success: false, error: "Grupo não encontrado" };
+
+  const hasAccess = shouldUseDatabase()
+    ? await canAccessGroupDB(lineId, userId)
+    : canAccessGroup(group, userId);
+  if (!hasAccess) return { success: false, error: "Você não tem permissão" };
+
+  if (!group.polls) return { success: false, error: "Enquete não encontrada" };
+  const poll = group.polls.find((p) => p.id === pollId);
+  if (!poll) return { success: false, error: "Enquete não encontrada" };
+  if (poll.closed) return { success: false, error: "Enquete encerrada" };
+
+  // Remove voto anterior do usuário em qualquer opção
+  poll.options.forEach((opt) => {
+    opt.votes = opt.votes.filter((v) => v !== userId);
+  });
+
+  const option = poll.options.find((o) => o.id === optionId);
+  if (!option) return { success: false, error: "Opção inválida" };
+  option.votes.push(userId);
+
+  return { success: true, poll };
+}
+
+async function getPoll(lineId, pollId) {
+  const group = findGroupChat(lineId);
+  if (!group || !group.polls) return { success: false, error: "Enquete não encontrada" };
+  const poll = group.polls.find((p) => p.id === pollId);
+  if (!poll) return { success: false, error: "Enquete não encontrada" };
+  return { success: true, poll };
+}
+
 async function clearChatDatabase() {
   privateConversations = [];
   groupChats = [];
@@ -491,5 +624,8 @@ module.exports = {
   addUserToGroupChat,
   removeUserFromGroupChat,
   subscribeToGroupConversation,
+  createPoll,
+  votePoll,
+  getPoll,
   clearChatDatabase,
 };

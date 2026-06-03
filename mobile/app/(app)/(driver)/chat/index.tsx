@@ -1,148 +1,122 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  FlatList,
   Pressable,
+  SafeAreaView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import {
-  createPrivateConversation,
-  validateUserExists,
-} from "../../../../services/chat";
-import { getSession } from "../../../../services/session";
+import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 import { theme } from "../../../../constants/theme";
+import { getDriverLines, type Line } from "../../../../services/driverLines";
+import { apiService } from "../../../../services/api";
+import { ApiEndpoints } from "../../../../constants/api";
+import { getSession } from "../../../../services/session";
 
 export default function DriverChatListScreen() {
   const router = useRouter();
-  const [passengerId, setPassengerId] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [lines, setLines] = useState<Line[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [driverId, setDriverId] = useState<string>("");
 
-  const startChat = async () => {
-    if (!passengerId.trim()) {
-      Alert.alert(
-        "ID do passageiro obrigatório",
-        "Informe o ID do passageiro para iniciar uma conversa privada.",
-      );
-      return;
-    }
-
+  const load = useCallback(async () => {
     setLoading(true);
+    const [session, linesRes] = await Promise.all([
+      getSession(),
+      getDriverLines(),
+    ]);
+    if (session?.userId) setDriverId(session.userId);
+    if (linesRes.success) setLines(linesRes.lines ?? []);
+    setLoading(false);
+  }, []);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const openGroupChat = async (line: Line) => {
+    // Auto-cria grupo se não existir
     try {
-      const session = await getSession();
-      if (!session?.userId) {
-        Alert.alert(
-          "Sessão expirada",
-          "Sua sessão expirou. Faça login novamente para continuar.",
-        );
-        return;
-      }
-
-      // Validar se o usuário existe
-      const userExists = await validateUserExists(passengerId.trim());
-      if (!userExists) {
-        Alert.alert(
-          "Passageiro não encontrado",
-          `Não encontramos um passageiro com o ID "${passengerId}". Verifique o código e tente novamente.`,
-        );
-        return;
-      }
-
-      const result = await createPrivateConversation({
-        passengerId: passengerId.trim(),
-        driverId: session.userId,
-        context: "marketplace",
+      await apiService.post(ApiEndpoints.CREATE_GROUP_CHAT, {
+        lineId: line.id,
+        ownerDriverId: driverId,
       });
-
-      if (result?.success && result.conversation?.id) {
-        setPassengerId("");
-        router.push(`/(app)/(driver)/chat/${result.conversation.id}`);
-        return;
-      }
-
-      Alert.alert(
-        "Não foi possível iniciar a conversa",
-        result?.error?.message ||
-          "Ocorreu um erro ao abrir o chat. Tente novamente em alguns instantes.",
-      );
-    } catch {
-      Alert.alert(
-        "Falha de conexão",
-        "Não foi possível iniciar o chat por falta de conexão com o servidor. Tente novamente.",
-      );
-    } finally {
-      setLoading(false);
-    }
+    } catch { /* group may already exist */ }
+    router.push({ pathname: "/(app)/shared/chat-group", params: { lineId: line.id, lineName: line.name } } as any);
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={theme.colors.brand.orange} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.kicker}>CHAT PRIVADO</Text>
-      <Text style={styles.title}>Converse com o passageiro</Text>
-      <Text style={styles.subtitle}>
-        Informe o ID do passageiro para abrir uma conversa direta.
-      </Text>
-      <TextInput
-        placeholder="ID do passageiro"
-        value={passengerId}
-        onChangeText={setPassengerId}
-        style={styles.input}
-        placeholderTextColor={theme.colors.text.muted}
-      />
-      <Pressable style={styles.button} onPress={startChat} disabled={loading}>
-        {loading ? (
-          <ActivityIndicator color={theme.colors.text.primary} />
-        ) : (
-          <Text style={styles.buttonText}>Abrir conversa</Text>
-        )}
-      </Pressable>
-    </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Chat</Text>
+      </View>
+
+      {lines.length === 0 ? (
+        <View style={styles.center}>
+          <Ionicons name="chatbubbles-outline" size={56} color={theme.colors.text.muted} style={{ opacity: 0.4, marginBottom: 16 }} />
+          <Text style={styles.emptyTitle}>Nenhuma linha cadastrada</Text>
+          <Text style={styles.emptyText}>Crie uma linha para acessar o chat do grupo.</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={lines}
+          keyExtractor={(item: Line) => item.id}
+          contentContainerStyle={styles.list}
+          ListHeaderComponent={<Text style={styles.sectionLabel}>Chats do grupo</Text>}
+          renderItem={({ item }: { item: Line }) => (
+            <Pressable style={styles.lineCard} onPress={() => openGroupChat(item)}>
+              <View style={styles.lineIcon}>
+                <Ionicons name="people" size={20} color={theme.colors.brand.orange} />
+              </View>
+              <View style={styles.lineInfo}>
+                <Text style={styles.lineName} numberOfLines={1}>{item.name || item.originCity}</Text>
+                <Text style={styles.lineRoute} numberOfLines={1}>{item.originCity} → {item.destinationPlace}</Text>
+                <Text style={styles.linePassengers}>{item.passengerCount ?? 0} passageiro(s)</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={theme.colors.text.muted} />
+            </Pressable>
+          )}
+        />
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 24,
-    gap: 14,
-    backgroundColor: theme.colors.background.app,
-  },
-  kicker: {
-    marginTop: 12,
-    color: theme.colors.text.accent,
-    fontSize: theme.font.xs,
-    fontWeight: "900",
-    letterSpacing: 1.4,
-  },
-  title: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: theme.colors.text.brand,
-  },
-  subtitle: {
-    color: theme.colors.text.secondary,
-    lineHeight: 22,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: theme.colors.border.input,
-    borderRadius: theme.radius.md,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    backgroundColor: theme.colors.background.input,
-    color: theme.colors.text.primary,
-  },
-  button: {
-    backgroundColor: theme.colors.brand.orange,
-    borderRadius: theme.radius.md,
-    paddingVertical: 14,
+  container: { flex: 1, backgroundColor: theme.colors.background.screen },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", padding: theme.spacing.xl },
+  header: { paddingHorizontal: theme.spacing.xl, paddingVertical: theme.spacing.lg, borderBottomWidth: 1, borderBottomColor: theme.colors.border.soft },
+  title: { fontSize: theme.font.xl, fontWeight: "800", color: theme.colors.text.primary },
+  emptyTitle: { fontSize: theme.font.lg, fontWeight: "700", color: theme.colors.text.primary, marginBottom: theme.spacing.sm, textAlign: "center" },
+  emptyText: { fontSize: theme.font.sm, color: theme.colors.text.secondary, textAlign: "center" },
+  list: { padding: theme.spacing.lg, gap: theme.spacing.sm },
+  sectionLabel: { fontSize: theme.font.xs, fontWeight: "700", color: theme.colors.text.secondary, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: theme.spacing.sm },
+  lineCard: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: theme.spacing.md,
+    backgroundColor: theme.colors.background.card,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border.soft,
+    ...theme.shadow.card,
   },
-  buttonText: {
-    color: theme.colors.text.primary,
-    fontWeight: "700",
-  },
+  lineIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.colors.brand.orange + "15", alignItems: "center", justifyContent: "center" },
+  lineInfo: { flex: 1, gap: 2 },
+  lineName: { fontSize: theme.font.md, fontWeight: "700", color: theme.colors.text.primary },
+  lineRoute: { fontSize: theme.font.sm, color: theme.colors.text.secondary },
+  linePassengers: { fontSize: theme.font.xs, color: theme.colors.text.muted },
 });
