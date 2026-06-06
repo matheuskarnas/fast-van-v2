@@ -18,7 +18,7 @@
 3. Selecionar perfil **"Motorista"**
 4. Preencher:
    - Nome: `João Motorista`
-   - CPF: `111.111.111-11`
+   - CPF: `303.850.130-19`
    - CNH: `12345678901`
    - Data de nascimento: `01/01/1990`
    - Email: `joao@motorista.com`
@@ -32,7 +32,7 @@
 2. Tocar em **"Criar conta"** → **"Passageiro"**
 3. Preencher:
    - Nome: `Ana Passageira`
-   - CPF: `222.222.222-22`
+   - CPF: `224.169.050-31`
    - Data de nascimento: `15/06/1995`
    - Email: `ana@passageira.com`
    - Senha: `Teste@123`
@@ -49,7 +49,7 @@
 1. Tocar na aba **"Veículo"** (ícone de carro)
 2. Tocar no **"+"** (botão laranja)
 3. Preencher:
-   - Placa: `ABC-1234`
+   - Placa: `ABC-1235`
    - Modelo: `Sprinter`
    - Ano: `2020`
    - Capacidade: `16`

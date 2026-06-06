@@ -1,6 +1,6 @@
 {
   "name": "fastvan",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Aplicativo para facilitar o dia-a-dia de passageiros e motoristas de vans",
   "private": true,
   "engines": {

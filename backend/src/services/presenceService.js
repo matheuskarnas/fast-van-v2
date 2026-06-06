@@ -437,6 +437,7 @@ async function listPassengerLinesByDate(passengerId, date) {
     const enrolled = await query(
       `SELECT e.line_id, e.departure_time, e.arrival_time,
               l.name, l.origin_city, l.destination_place,
+              l.departure_times, l.arrival_times,
               COALESCE(p.status, $3) as status,
               p.alternate_departure_time, p.alternate_arrival_time, p.slot_status
        FROM line_enrollments e
@@ -456,6 +457,8 @@ async function listPassengerLinesByDate(passengerId, date) {
         status: r.status,
         departureTime: r.departure_time,
         arrivalTime: r.arrival_time,
+        departureTimes: r.departure_times || [],
+        arrivalTimes: r.arrival_times || [],
         alternateDepartureTime: r.alternate_departure_time,
         alternateArrivalTime: r.alternate_arrival_time,
         slotStatus: r.slot_status || "confirmed",

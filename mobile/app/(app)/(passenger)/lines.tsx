@@ -199,16 +199,22 @@ export default function PassengerLinesScreen() {
             <Text style={styles.modalTitle}>Trocar horário amanhã</Text>
             <Text style={styles.modalSub}>Seu horário fixo: {slotModalLine?.departureTime ?? "—"} • Selecione um horário alternativo:</Text>
             <View style={styles.slotPickerRow}>
-              {/* Placeholder: slots disponíveis viriam do backend */}
-              {["07:10", "08:00"].filter((s) => s !== slotModalLine?.departureTime).map((s) => (
-                <Pressable
-                  key={s}
-                  style={[styles.slotChip, selectedSlot === s && styles.slotChipSelected]}
-                  onPress={() => setSelectedSlot(s)}
-                >
-                  <Text style={[styles.slotChipText, selectedSlot === s && styles.slotChipTextSelected]}>{s}</Text>
-                </Pressable>
-              ))}
+              {(slotModalLine?.departureTimes ?? [])
+                .filter((s) => s !== slotModalLine?.departureTime)
+                .map((s) => (
+                  <Pressable
+                    key={s}
+                    style={[styles.slotChip, selectedSlot === s && styles.slotChipSelected]}
+                    onPress={() => setSelectedSlot(s)}
+                  >
+                    <Text style={[styles.slotChipText, selectedSlot === s && styles.slotChipTextSelected]}>{s}</Text>
+                  </Pressable>
+                ))}
+              {(slotModalLine?.departureTimes ?? []).filter((s) => s !== slotModalLine?.departureTime).length === 0 && (
+                <Text style={{ fontSize: 13, color: "#888" }}>
+                  Esta linha tem apenas um horário de ida. Não há troca disponível.
+                </Text>
+              )}
             </View>
             <View style={styles.modalActions}>
               <Pressable style={styles.modalCancelBtn} onPress={() => setSlotModalLine(null)}>

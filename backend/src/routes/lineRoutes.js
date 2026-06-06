@@ -1,6 +1,6 @@
 const express = require("express");
 const { requireAuth } = require("../middlewares/authMiddleware");
-const { createInvite, acceptInvite } = require("../services/inviteService");
+const { createInvite, acceptInvite, getInvite } = require("../services/inviteService");
 const { registerOccurrence, listOccurrences } = require("../services/occurrenceService");
 const { registerNoShow } = require("../services/noShowService");
 const { createSuggestion, listPendingSuggestions, listMySuggestions, decideSuggestion } = require("../services/pointSuggestionService");

@@ -16,6 +16,8 @@ export interface PresenceLineSummary {
   status: PresenceStatus;
   departureTime?: string | null;
   arrivalTime?: string | null;
+  departureTimes?: string[];
+  arrivalTimes?: string[];
   alternateDepartureTime?: string | null;
   alternateArrivalTime?: string | null;
   slotStatus?: "confirmed" | "switched" | "waitlist";
