@@ -11,6 +11,8 @@ const {
   addPickupDropoffPoint,
   updatePickupDropoffPoint,
   removePickupDropoffPoint,
+  listLinePassengers,
+  updatePointPassengers,
 } = require("../services/lineService");
 
 const router = express.Router();
@@ -81,6 +83,28 @@ router.get("/:id", requireAuth, async (req, res, next) => {
   }
 });
 
+router.get("/:lineId/passengers", requireAuth, async (req, res, next) => {
+  try {
+    if (req.auth.role !== "DRIVER") {
+      return res.status(403).json({
+        success: false,
+        error: { code: "FORBIDDEN_RESOURCE", message: "Somente motoristas podem listar passageiros da linha" },
+      });
+    }
+    const result = await listLinePassengers(req.params.lineId, req.auth.id);
+    if (result.error) {
+      const status = result.error.includes("permiss") ? 403 : 404;
+      return res.status(status).json({
+        success: false,
+        error: { code: "LINE_PASSENGERS_FETCH_FAILED", message: result.error },
+      });
+    }
+    return res.status(200).json({ success: true, passengers: result.passengers });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 // ===== CRUD de Pontos =====
 
 router.post("/:id/points", requireAuth, async (req, res, next) => {
@@ -119,6 +143,35 @@ router.patch("/:id/points/:pointId", requireAuth, async (req, res, next) => {
       return res.status(status).json({
         success: false,
         error: { code: "POINT_UPDATE_FAILED", message: result.error },
+      });
+    }
+    return res.status(200).json({ success: true, point: result.point });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.patch("/:id/points/:pointId/passengers", requireAuth, async (req, res, next) => {
+  try {
+    if (req.auth.role !== "DRIVER") {
+      return res.status(403).json({
+        success: false,
+        error: { code: "FORBIDDEN_RESOURCE", message: "Somente motoristas podem gerenciar passageiros do ponto" },
+      });
+    }
+    const { passengerIds } = req.body || {};
+    if (!Array.isArray(passengerIds)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: "INVALID_PAYLOAD", message: "passengerIds deve ser uma lista" },
+      });
+    }
+    const result = await updatePointPassengers(req.params.id, req.params.pointId, passengerIds, req.auth.id);
+    if (result.error) {
+      const status = result.error.includes("permiss") ? 403 : result.error.includes("não encontrad") ? 404 : 400;
+      return res.status(status).json({
+        success: false,
+        error: { code: "POINT_PASSENGERS_UPDATE_FAILED", message: result.error },
       });
     }
     return res.status(200).json({ success: true, point: result.point });

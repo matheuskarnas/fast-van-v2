@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -28,7 +28,6 @@ import { ApiEndpoints } from "../../../../../constants/api";
 const OCCURRENCE_TYPES = [
   { key: "slow_traffic", label: "Trânsito lento", icon: "car-outline" },
   { key: "passenger_late", label: "Passageiro atrasado", icon: "time-outline" },
-  { key: "passenger_no_show", label: "Não apareceu", icon: "person-remove-outline" },
   { key: "other", label: "Outro", icon: "alert-circle-outline" },
 ] as const;
 
@@ -51,10 +50,19 @@ function haversineDistance(
 }
 
 type ExecutionStatus = "idle" | "starting" | "running" | "checking_in";
+type OperationSegment = "ida" | "volta";
 
 interface PointStatus {
   pointId: string;
   done: boolean;
+}
+
+function getPointPassengerId(passenger: string | { id: string; name?: string }) {
+  return typeof passenger === "string" ? passenger : passenger.id;
+}
+
+function getPointPassengerName(passenger: string | { id: string; name?: string }) {
+  return typeof passenger === "string" ? passenger : passenger.name || passenger.id;
 }
 
 export default function LineOperationScreen() {
@@ -62,6 +70,7 @@ export default function LineOperationScreen() {
   const router = useRouter();
 
   const [points, setPoints] = useState<LinePoint[]>([]);
+  const [activeSegment, setActiveSegment] = useState<OperationSegment>("ida");
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<ExecutionStatus>("idle");
   const [pointStatuses, setPointStatuses] = useState<PointStatus[]>([]);
@@ -72,9 +81,17 @@ export default function LineOperationScreen() {
   const [occurrenceType, setOccurrenceType] = useState<string>("slow_traffic");
   const [occurrenceNotes, setOccurrenceNotes] = useState("");
   const [savingOccurrence, setSavingOccurrence] = useState(false);
-  // RF25: passageiros confirmados (carregados da API de presença)
-  const [confirmedPassengers, setConfirmedPassengers] = useState<{ passengerId: string; name?: string; status: string }[]>([]);
   const [noShowDone, setNoShowDone] = useState<Set<string>>(new Set());
+
+  const operationPoints = useMemo(
+    () => points.filter((point) => point.segment === activeSegment),
+    [activeSegment, points],
+  );
+
+  const geofenceExecutionId = useMemo(
+    () => `${lineId}-${activeSegment}`,
+    [activeSegment, lineId],
+  );
 
   const loadLine = useCallback(async () => {
     if (!lineId) return;
@@ -84,7 +101,6 @@ export default function LineOperationScreen() {
         (p) => p.latitude != null && p.longitude != null,
       );
       setPoints(geoPoints);
-      setPointStatuses(geoPoints.map((p) => ({ pointId: p.id, done: false })));
     } else {
       Alert.alert("Erro", "Linha não encontrada.");
       router.back();
@@ -93,6 +109,19 @@ export default function LineOperationScreen() {
   }, [lineId]);
 
   useEffect(() => { loadLine(); }, [loadLine]);
+
+  useEffect(() => {
+    setPointStatuses(operationPoints.map((p) => ({ pointId: p.id, done: false })));
+    setNoShowDone(new Set());
+  }, [operationPoints]);
+
+  const handleSegmentChange = (segment: OperationSegment) => {
+    if (isRunning || isStarting) {
+      Alert.alert("Operação em andamento", "Finalize ou saia da operação atual antes de trocar o trecho.");
+      return;
+    }
+    setActiveSegment(segment);
+  };
 
   const startGPS = async () => {
     const { status: perm } = await Location.requestForegroundPermissionsAsync();
@@ -112,16 +141,16 @@ export default function LineOperationScreen() {
   }, []);
 
   const handleStart = async () => {
-    if (!lineId || points.length === 0) {
+    if (!lineId || operationPoints.length === 0) {
       Alert.alert("Sem pontos", "Adicione pontos com localização antes de iniciar a rota.");
       return;
     }
     setStatus("starting");
     try {
       await createGeofenceLine({
-        lineId,
+        lineId: geofenceExecutionId,
         nextDate: TODAY,
-        points: points.map((p) => ({
+        points: operationPoints.map((p) => ({
           id: p.id,
           segment: p.segment === "ida" ? "IDA" : "VOLTA",
           latitude: p.latitude!,
@@ -129,7 +158,7 @@ export default function LineOperationScreen() {
           radiusMeters: DEFAULT_RADIUS_M,
         })),
       });
-      const startRes = await startLineExecution({ lineId, date: TODAY }) as any;
+      const startRes = await startLineExecution({ lineId: geofenceExecutionId, date: TODAY }) as any;
       if (!startRes.success) throw new Error(startRes.error?.message ?? "Falha ao iniciar");
       await startGPS();
       setStatus("running");
@@ -149,7 +178,7 @@ export default function LineOperationScreen() {
         setCurrentLocation(loc);
       }
       const res = await processGeofenceCheckIn({
-        lineId: lineId!,
+        lineId: geofenceExecutionId,
         pointId: point.id,
         date: TODAY,
         location: loc,
@@ -158,7 +187,7 @@ export default function LineOperationScreen() {
         setPointStatuses((prev) =>
           prev.map((ps) => ps.pointId === point.id ? { ...ps, done: true } : ps),
         );
-        await getLineExecutionState(lineId!, TODAY);
+        await getLineExecutionState(geofenceExecutionId, TODAY);
       } else {
         Alert.alert("Erro no check-in", res.error?.message ?? "Não foi possível registrar chegada.");
       }
@@ -169,22 +198,40 @@ export default function LineOperationScreen() {
     }
   };
 
-  const handleNoShow = useCallback(async (passengerId: string, segment: string) => {
+  const handleNoShow = useCallback(async (
+    passengerId: string,
+    passengerName: string,
+    segment: string,
+  ) => {
     if (!lineId) return;
-    try {
-      const url = ApiEndpoints.POST_NO_SHOW.replace(":lineId", lineId);
-      await apiService.post(url, {
-        passengerId,
-        segment,
-        date: TODAY,
-        latitude: currentLocation?.latitude ?? null,
-        longitude: currentLocation?.longitude ?? null,
-      });
-      setNoShowDone((prev) => new Set([...prev, passengerId]));
-      Alert.alert("Registrado", "Passageiro marcado como não embarcou.");
-    } catch (e: any) {
-      Alert.alert("Erro", e?.response?.data?.error?.message ?? "Não foi possível registrar.");
-    }
+
+    Alert.alert(
+      "Confirmar não embarque",
+      `Registrar que ${passengerName} não embarcou neste ponto? Isso vai gerar um log operacional com data, hora e GPS.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Registrar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const url = ApiEndpoints.POST_NO_SHOW.replace(":lineId", lineId);
+              await apiService.post(url, {
+                passengerId,
+                segment,
+                date: TODAY,
+                latitude: currentLocation?.latitude ?? null,
+                longitude: currentLocation?.longitude ?? null,
+              });
+              setNoShowDone((prev) => new Set([...prev, passengerId]));
+              Alert.alert("Log registrado", "O não embarque foi salvo como ocorrência operacional.");
+            } catch (e: any) {
+              Alert.alert("Erro", e?.response?.data?.error?.message ?? "Não foi possível registrar.");
+            }
+          },
+        },
+      ],
+    );
   }, [lineId, currentLocation]);
 
   const handleOccurrence = useCallback(async () => {
@@ -278,16 +325,47 @@ export default function LineOperationScreen() {
 
         {!isRunning && !isStarting && (
           <>
-            <Text style={styles.sectionTitle}>Pontos da rota ({points.length})</Text>
-            {points.length === 0 ? (
+            <View style={styles.segmentControl}>
+              <Pressable
+                style={[styles.segmentBtn, activeSegment === "ida" && styles.segmentBtnActive]}
+                onPress={() => handleSegmentChange("ida")}
+              >
+                <Ionicons
+                  name="arrow-forward-circle"
+                  size={16}
+                  color={activeSegment === "ida" ? theme.colors.text.inverse : theme.colors.brand.navy}
+                />
+                <Text style={[styles.segmentBtnText, activeSegment === "ida" && styles.segmentBtnTextActive]}>
+                  Ida
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.segmentBtn, activeSegment === "volta" && styles.segmentBtnActive]}
+                onPress={() => handleSegmentChange("volta")}
+              >
+                <Ionicons
+                  name="return-down-back"
+                  size={16}
+                  color={activeSegment === "volta" ? theme.colors.text.inverse : theme.colors.brand.navy}
+                />
+                <Text style={[styles.segmentBtnText, activeSegment === "volta" && styles.segmentBtnTextActive]}>
+                  Volta
+                </Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.sectionTitle}>
+              Pontos da {activeSegment} ({operationPoints.length})
+            </Text>
+            {operationPoints.length === 0 ? (
               <View style={styles.emptyBox}>
                 <Ionicons name="map-outline" size={40} color={theme.colors.text.muted} />
                 <Text style={styles.emptyText}>
-                  Nenhum ponto com localização cadastrado. Adicione pontos com endereço via Google Places antes de iniciar.
+                  Nenhum ponto com localização cadastrado para este trecho.
                 </Text>
               </View>
             ) : (
-              points.map((p, i) => (
+              operationPoints.map((p, i) => (
                 <View key={p.id} style={styles.pointPreview}>
                   <Text style={styles.pointIndex}>{i + 1}</Text>
                   <View style={styles.pointInfo}>
@@ -300,7 +378,7 @@ export default function LineOperationScreen() {
               ))
             )}
 
-            {points.length > 0 && (
+            {operationPoints.length > 0 && (
               <Pressable
                 style={[styles.startBtn, isStarting && styles.btnDisabled]}
                 onPress={handleStart}
@@ -310,7 +388,9 @@ export default function LineOperationScreen() {
                   ? <ActivityIndicator color={theme.colors.text.inverse} />
                   : <>
                       <Ionicons name="play-circle" size={22} color={theme.colors.text.inverse} />
-                      <Text style={styles.startBtnText}>Iniciar rota de hoje</Text>
+                      <Text style={styles.startBtnText}>
+                        Iniciar {activeSegment} de hoje
+                      </Text>
                     </>
                 }
               </Pressable>
@@ -329,7 +409,7 @@ export default function LineOperationScreen() {
             ) : (
               <>
                 <Text style={styles.sectionTitle}>Pontos da rota</Text>
-                {points.map((p) => {
+                {operationPoints.map((p) => {
                   const ps = pointStatuses.find((s) => s.pointId === p.id);
                   const done = ps?.done ?? false;
                   const isNext = p.id === nextPendingId;
@@ -373,7 +453,9 @@ export default function LineOperationScreen() {
                           {(p.passengers ?? []).length > 0 && (
                             <View style={styles.passengersSection}>
                               <Text style={styles.passengersSectionTitle}>Passageiros esperados</Text>
-                              {(p.passengers ?? []).map((pid: string) => {
+                              {(p.passengers ?? []).map((passenger) => {
+                                const pid = getPointPassengerId(passenger);
+                                const passengerName = getPointPassengerName(passenger);
                                 const alreadyNoShow = noShowDone.has(pid);
                                 return (
                                   <View key={pid} style={styles.passengerRow}>
@@ -383,14 +465,18 @@ export default function LineOperationScreen() {
                                       color={alreadyNoShow ? theme.colors.feedback.error : theme.colors.text.secondary}
                                     />
                                     <Text style={[styles.passengerName, alreadyNoShow && { color: theme.colors.feedback.error, textDecorationLine: "line-through" }]}>
-                                      {pid}
+                                      {passengerName}
                                     </Text>
-                                    {!alreadyNoShow && (
+                                    {alreadyNoShow ? (
+                                      <View style={styles.noShowLogged}>
+                                        <Text style={styles.noShowLoggedText}>Não embarcou registrado</Text>
+                                      </View>
+                                    ) : (
                                       <Pressable
                                         style={styles.noShowBtn}
-                                        onPress={() => handleNoShow(pid, p.segment ?? "ida")}
+                                        onPress={() => handleNoShow(pid, passengerName, p.segment ?? "ida")}
                                       >
-                                        <Text style={styles.noShowBtnText}>Não embarcou</Text>
+                                        <Text style={styles.noShowBtnText}>Marcar não embarcou</Text>
                                       </Pressable>
                                     )}
                                   </View>
@@ -523,6 +609,8 @@ const styles = StyleSheet.create({
   passengerName: { flex: 1, fontSize: theme.font.sm, color: theme.colors.text.secondary },
   noShowBtn: { paddingHorizontal: theme.spacing.sm, paddingVertical: 4, borderRadius: theme.radius.pill, borderWidth: 1, borderColor: theme.colors.feedback.error + "60", backgroundColor: theme.colors.feedback.error + "10" },
   noShowBtnText: { fontSize: theme.font.xs, fontWeight: "700", color: theme.colors.feedback.error },
+  noShowLogged: { paddingHorizontal: theme.spacing.sm, paddingVertical: 4, borderRadius: theme.radius.pill, backgroundColor: theme.colors.feedback.error + "15" },
+  noShowLoggedText: { fontSize: theme.font.xs, fontWeight: "700", color: theme.colors.feedback.error },
   occBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.feedback.warning + "20", alignItems: "center", justifyContent: "center" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   modalCard: { backgroundColor: theme.colors.background.card, borderTopLeftRadius: theme.radius.xl, borderTopRightRadius: theme.radius.xl, padding: theme.spacing.xl, gap: theme.spacing.md },

@@ -6,7 +6,7 @@ export interface LinePoint {
   address: string;
   type: "pickup" | "dropoff";
   segment: "ida" | "volta";
-  passengers?: string[];
+  passengers?: Array<string | { id: string; name?: string }>;
   latitude?: number | null;
   longitude?: number | null;
   placeId?: string | null;
@@ -25,6 +25,13 @@ export interface Line {
   ownerDriverId: string;
   driverId?: string;
   passengerCount?: number;
+}
+
+export interface LinePassenger {
+  id: string;
+  name: string;
+  departureTime?: string | null;
+  arrivalTime?: string | null;
 }
 
 export interface CreateLinePayload {
@@ -66,6 +73,12 @@ export interface PointResponse {
   success: boolean;
   point?: LinePoint;
   message?: string;
+  error?: ServiceError;
+}
+
+export interface LinePassengersResponse {
+  success: boolean;
+  passengers?: LinePassenger[];
   error?: ServiceError;
 }
 
@@ -159,6 +172,32 @@ export async function removeLinePoint(lineId: string, pointId: string): Promise<
       .replace(":lineId", lineId)
       .replace(":pointId", pointId);
     const response = await apiService.delete<PointResponse>(url);
+    return response.data;
+  } catch (error: any) {
+    return { success: false, error: extractError(error) };
+  }
+}
+
+export async function getLinePassengers(lineId: string): Promise<LinePassengersResponse> {
+  try {
+    const url = ApiEndpoints.GET_LINE_PASSENGERS.replace(":lineId", lineId);
+    const response = await apiService.get<LinePassengersResponse>(url);
+    return response.data;
+  } catch (error: any) {
+    return { success: false, error: extractError(error) };
+  }
+}
+
+export async function updateLinePointPassengers(
+  lineId: string,
+  pointId: string,
+  passengerIds: string[],
+): Promise<PointResponse> {
+  try {
+    const url = ApiEndpoints.UPDATE_LINE_POINT_PASSENGERS
+      .replace(":lineId", lineId)
+      .replace(":pointId", pointId);
+    const response = await apiService.patch<PointResponse>(url, { passengerIds });
     return response.data;
   } catch (error: any) {
     return { success: false, error: extractError(error) };

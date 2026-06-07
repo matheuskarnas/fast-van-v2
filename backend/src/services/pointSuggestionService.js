@@ -73,10 +73,11 @@ async function decideSuggestion(suggestionId, driverId, decision, rejectionReaso
       const s = check.rows[0];
       // Cria o ponto na linha
       const { addPickupDropoffPoint } = require("./lineService");
-      await addPickupDropoffPoint(s.line_id, driverId, {
+      await addPickupDropoffPoint(s.line_id, {
         address: s.address, type: s.type, segment: s.segment,
         latitude: s.latitude, longitude: s.longitude, placeId: s.place_id,
-      });
+        passengerId: s.passenger_id,
+      }, driverId);
     }
 
     const updated = await query(`SELECT * FROM point_suggestions WHERE id=$1`, [suggestionId]);

@@ -32,6 +32,7 @@ export const ApiEndpoints = {
   GET_LINE: `${API_URL}/api/v1/lines/:id`,
   UPDATE_LINE: `${API_URL}/api/v1/lines/:id`,
   JOIN_LINE: `${API_URL}/api/v1/lines/:id/join`,
+  GET_LINE_PASSENGERS: `${API_URL}/api/v1/lines/:lineId/passengers`,
 
   // Presence (RF3/RF26)
   GET_MY_PRESENCE_LINES: `${API_URL}/api/v1/presence/me/lines`,
@@ -112,6 +113,7 @@ export const ApiEndpoints = {
   // Line points
   ADD_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points`,
   UPDATE_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points/:pointId`,
+  UPDATE_LINE_POINT_PASSENGERS: `${API_URL}/api/v1/lines/:lineId/points/:pointId/passengers`,
   DELETE_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points/:pointId`,
 };
 

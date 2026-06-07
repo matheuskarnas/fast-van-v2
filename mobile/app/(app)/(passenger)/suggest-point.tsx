@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -18,6 +19,11 @@ import { ApiEndpoints } from "../../../constants/api";
 const GOOGLE_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 
 interface PlaceResult { placeId: string; description: string }
+type Segment = "ida" | "volta";
+
+function segmentToType(segment: Segment) {
+  return segment === "ida" ? "pickup" : "dropoff";
+}
 
 async function searchPlaces(input: string): Promise<PlaceResult[]> {
   if (!input.trim() || !GOOGLE_KEY) return [];
@@ -49,8 +55,7 @@ export default function SuggestPointScreen() {
   const [selectedPlaceId, setSelectedPlaceId] = useState("");
   const [selectedLat, setSelectedLat] = useState<number | null>(null);
   const [selectedLng, setSelectedLng] = useState<number | null>(null);
-  const [type, setType] = useState<"pickup" | "dropoff">("pickup");
-  const [segment, setSegment] = useState<"ida" | "volta">("ida");
+  const [segments, setSegments] = useState<Set<Segment>>(new Set(["ida"]));
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -73,25 +78,41 @@ export default function SuggestPointScreen() {
     if (coords) { setSelectedLat(coords.lat); setSelectedLng(coords.lng); }
   };
 
+  const toggleSegment = (selectedSegment: Segment) => {
+    setSegments((current) => {
+      const next = new Set(current);
+      if (next.has(selectedSegment) && next.size === 1) return next;
+      if (next.has(selectedSegment)) {
+        next.delete(selectedSegment);
+      } else {
+        next.add(selectedSegment);
+      }
+      return next;
+    });
+  };
+
   const handleSubmit = async () => {
     if (!selectedAddress) { Alert.alert("Atenção", "Selecione um endereço da lista."); return; }
     setSaving(true);
     try {
       const url = ApiEndpoints.POST_SUGGESTION.replace(":lineId", lineId!);
-      const res = await apiService.post<{ success: boolean; error?: any }>(url, {
-        address: selectedAddress,
-        type,
-        segment,
-        latitude: selectedLat,
-        longitude: selectedLng,
-        placeId: selectedPlaceId || undefined,
-      });
-      if ((res.data as any).success) {
+      const results = await Promise.all(
+        [...segments].map((segment) => apiService.post<{ success: boolean; error?: any }>(url, {
+          address: selectedAddress,
+          type: segmentToType(segment),
+          segment,
+          latitude: selectedLat,
+          longitude: selectedLng,
+          placeId: selectedPlaceId || undefined,
+        })),
+      );
+      const failed = results.find((res) => !(res.data as any).success);
+      if (!failed) {
         Alert.alert("Sugestão enviada!", "O motorista irá analisar e aprovar seu novo ponto.", [
           { text: "OK", onPress: () => router.back() },
         ]);
       } else {
-        Alert.alert("Erro", (res.data as any).error?.message ?? "Não foi possível enviar a sugestão.");
+        Alert.alert("Erro", (failed.data as any).error?.message ?? "Não foi possível enviar a sugestão.");
       }
     } catch (e: any) {
       Alert.alert("Erro", e?.response?.data?.error?.message ?? "Falha ao enviar sugestão.");
@@ -112,48 +133,7 @@ export default function SuggestPointScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.label}>Endereço (Google Places)</Text>
-        <View style={styles.inputWrap}>
-          <Ionicons name="search" size={18} color={theme.colors.text.muted} style={styles.inputIcon} />
-          <View style={{ flex: 1 }}>
-            <Text
-              style={[styles.input, selectedAddress ? styles.inputSelected : {}]}
-              onPress={() => { if (selectedAddress) { setSelectedAddress(""); setAddressQuery(""); } }}
-            >
-              {selectedAddress || addressQuery || "Buscar endereço..."}
-            </Text>
-          </View>
-        </View>
-
-        {/* TextInput real escondido */}
-        <View style={styles.searchInputWrap}>
-          <Ionicons name="location-outline" size={18} color={theme.colors.text.muted} />
-          <Text
-            style={styles.searchHint}
-            onPress={() => {}}
-          >
-            {searching ? "Buscando..." : "Digite o endereço acima"}
-          </Text>
-        </View>
-
-        {/* Campo de busca real */}
-        <View style={styles.searchBox}>
-          {[addressQuery].map((_, i) => (
-            <View key={i}>
-              <Text style={styles.label}>Digite para buscar</Text>
-              <View style={styles.row}>
-                <Text
-                  style={styles.searchField}
-                  onPress={() => {}}
-                >
-                  {addressQuery}
-                </Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Autocomplete real usando TextInput */}
+        <Text style={styles.label}>Endereço</Text>
         <View style={styles.autocompleteContainer}>
           <AddressInput
             value={addressQuery}
@@ -165,32 +145,29 @@ export default function SuggestPointScreen() {
           />
         </View>
 
-        <Text style={styles.label}>Tipo</Text>
+        <Text style={styles.label}>Trecho</Text>
+        <Text style={styles.hint}>Pode selecionar os dois para sugerir o ponto na ida e na volta</Text>
         <View style={styles.toggleRow}>
-          {(["pickup", "dropoff"] as const).map((t) => (
-            <Pressable key={t} style={[styles.toggleBtn, type === t && styles.toggleBtnActive]} onPress={() => setType(t)}>
-              <Ionicons name={t === "pickup" ? "arrow-up-circle-outline" : "arrow-down-circle-outline"} size={18} color={type === t ? "#fff" : theme.colors.text.secondary} />
-              <Text style={[styles.toggleBtnText, type === t && styles.toggleBtnTextActive]}>
-                {t === "pickup" ? "Embarque" : "Desembarque"}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Text style={styles.label}>Segmento</Text>
-        <View style={styles.toggleRow}>
-          {(["ida", "volta"] as const).map((s) => (
-            <Pressable key={s} style={[styles.toggleBtn, segment === s && styles.toggleBtnActive]} onPress={() => setSegment(s)}>
-              <Ionicons name={s === "ida" ? "arrow-forward-circle-outline" : "return-down-back-outline"} size={18} color={segment === s ? "#fff" : theme.colors.text.secondary} />
-              <Text style={[styles.toggleBtnText, segment === s && styles.toggleBtnTextActive]}>
-                {s === "ida" ? "Ida" : "Volta"}
-              </Text>
-            </Pressable>
-          ))}
+          <ToggleButton
+            label="Ida"
+            icon="arrow-forward-circle"
+            active={segments.has("ida")}
+            onPress={() => toggleSegment("ida")}
+          />
+          <ToggleButton
+            label="Volta"
+            icon="return-down-back"
+            active={segments.has("volta")}
+            onPress={() => toggleSegment("volta")}
+          />
         </View>
 
         <Pressable style={[styles.submitBtn, saving && styles.btnDisabled]} onPress={handleSubmit} disabled={saving}>
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Enviar sugestão</Text>}
+          {saving ? <ActivityIndicator color="#fff" /> : (
+            <Text style={styles.submitBtnText}>
+              {segments.size === 2 ? "Enviar sugestões" : "Enviar sugestão"}
+            </Text>
+          )}
         </Pressable>
 
         <View style={styles.infoBox}>
@@ -201,8 +178,6 @@ export default function SuggestPointScreen() {
     </SafeAreaView>
   );
 }
-
-import { TextInput } from "react-native";
 
 function AddressInput({ value, onChangeText, onSelect, suggestions, searching, selectedAddress }: any) {
   if (selectedAddress) {
@@ -237,6 +212,20 @@ function AddressInput({ value, onChangeText, onSelect, suggestions, searching, s
   );
 }
 
+function ToggleButton({ label, icon, active, onPress }: {
+  label: string; icon: string; active: boolean; onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={[styles.toggleBtn, active && styles.toggleBtnActive]}
+      onPress={onPress}
+    >
+      <Ionicons name={icon as any} size={20} color={active ? theme.colors.brand.navy : theme.colors.text.muted} />
+      <Text style={[styles.toggleBtnText, active && styles.toggleBtnTextActive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background.screen },
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.lg, borderBottomWidth: 1, borderBottomColor: theme.colors.border.soft, gap: theme.spacing.md },
@@ -244,17 +233,9 @@ const styles = StyleSheet.create({
   headerInfo: { flex: 1 },
   headerTitle: { fontSize: theme.font.lg, fontWeight: "800", color: theme.colors.text.primary },
   headerSub: { fontSize: theme.font.sm, color: theme.colors.text.secondary },
-  content: { padding: theme.spacing.lg, gap: theme.spacing.md },
-  label: { fontSize: theme.font.sm, fontWeight: "700", color: theme.colors.text.secondary },
-  inputWrap: { display: "none" },
-  inputIcon: { position: "absolute" },
-  input: { fontSize: theme.font.md, color: theme.colors.text.muted },
-  inputSelected: { color: theme.colors.text.primary },
-  searchInputWrap: { display: "none" },
-  searchHint: { fontSize: theme.font.sm, color: theme.colors.text.muted },
-  searchBox: { display: "none" },
-  searchField: {},
-  row: {},
+  content: { padding: theme.spacing.lg, gap: theme.spacing.md, paddingBottom: 48 },
+  label: { fontSize: theme.font.sm, fontWeight: "700", color: theme.colors.text.secondary, textTransform: "uppercase", letterSpacing: 0.5 },
+  hint: { fontSize: theme.font.xs, color: theme.colors.text.muted, marginTop: -theme.spacing.sm },
   autocompleteContainer: { gap: theme.spacing.xs },
   textInput: { borderWidth: 1.5, borderColor: theme.colors.border.default, borderRadius: theme.radius.md, padding: theme.spacing.md, fontSize: theme.font.md, color: theme.colors.text.primary, backgroundColor: theme.colors.background.card },
   suggestionItem: { flexDirection: "row", alignItems: "flex-start", gap: theme.spacing.sm, padding: theme.spacing.md, borderBottomWidth: 1, borderBottomColor: theme.colors.border.soft, backgroundColor: theme.colors.background.card },
@@ -262,10 +243,10 @@ const styles = StyleSheet.create({
   selectedBox: { flexDirection: "row", alignItems: "center", gap: theme.spacing.sm, padding: theme.spacing.md, backgroundColor: theme.colors.feedback.success + "10", borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.feedback.success + "30" },
   selectedText: { flex: 1, fontSize: theme.font.sm, color: theme.colors.text.primary, fontWeight: "600" },
   toggleRow: { flexDirection: "row", gap: theme.spacing.md },
-  toggleBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: theme.spacing.sm, paddingVertical: theme.spacing.md, borderRadius: theme.radius.md, borderWidth: 1.5, borderColor: theme.colors.border.default, backgroundColor: theme.colors.background.muted },
-  toggleBtnActive: { backgroundColor: theme.colors.brand.orange, borderColor: theme.colors.brand.orange },
-  toggleBtnText: { fontSize: theme.font.sm, fontWeight: "600", color: theme.colors.text.secondary },
-  toggleBtnTextActive: { color: "#fff" },
+  toggleBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: theme.spacing.sm, paddingVertical: theme.spacing.md, borderRadius: theme.radius.md, borderWidth: 1.5, borderColor: theme.colors.border.default, backgroundColor: theme.colors.background.card },
+  toggleBtnActive: { backgroundColor: theme.colors.brand.navy + "15", borderColor: theme.colors.brand.navy },
+  toggleBtnText: { fontSize: theme.font.md, fontWeight: "700", color: theme.colors.text.muted },
+  toggleBtnTextActive: { color: theme.colors.brand.navy },
   submitBtn: { backgroundColor: theme.colors.brand.orange, paddingVertical: theme.spacing.lg, borderRadius: theme.radius.pill, alignItems: "center", marginTop: theme.spacing.sm },
   submitBtnText: { color: "#fff", fontWeight: "800", fontSize: theme.font.md },
   btnDisabled: { opacity: 0.6 },

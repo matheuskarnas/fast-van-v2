@@ -44,6 +44,191 @@ function mapPointRowToDomain(row) {
   };
 }
 
+function getPassengerId(passenger) {
+  if (!passenger) return null;
+  if (typeof passenger === "string") return passenger;
+  return passenger.id || passenger.passengerId || null;
+}
+
+function normalizePassengerIds(passengers) {
+  if (!Array.isArray(passengers)) return [];
+  return passengers.map(getPassengerId).filter(Boolean);
+}
+
+async function getEnrolledPassengerMap(lineId) {
+  if (!shouldUseDatabase()) return new Map();
+  const result = await query(
+    `SELECT e.passenger_id, u.name
+       FROM line_enrollments e
+       LEFT JOIN users u ON u.id = e.passenger_id
+      WHERE e.line_id = $1
+      ORDER BY u.name`,
+    [lineId],
+  );
+  return new Map(
+    result.rows.map((row) => [
+      row.passenger_id,
+      { id: row.passenger_id, name: row.name || row.passenger_id },
+    ]),
+  );
+}
+
+async function listLinePassengers(lineId, driverId) {
+  try {
+    if (shouldUseDatabase()) {
+      const lineRes = await query(`SELECT owner_driver_id, driver_id FROM lines WHERE id = $1`, [lineId]);
+      if (!lineRes.rows[0]) return { success: false, error: "Linha não encontrada" };
+      const { owner_driver_id, driver_id } = lineRes.rows[0];
+      if (owner_driver_id !== driverId && driver_id !== driverId) {
+        return { success: false, error: "Você não tem permissão para acessar esta linha" };
+      }
+
+      const res = await query(
+        `SELECT e.passenger_id, e.departure_time, e.arrival_time, u.name
+           FROM line_enrollments e
+           LEFT JOIN users u ON u.id = e.passenger_id
+          WHERE e.line_id = $1
+          ORDER BY u.name, e.passenger_id`,
+        [lineId],
+      );
+
+      return {
+        success: true,
+        passengers: res.rows.map((row) => ({
+          id: row.passenger_id,
+          name: row.name || row.passenger_id,
+          departureTime: row.departure_time,
+          arrivalTime: row.arrival_time,
+        })),
+      };
+    }
+
+    const line = process.env.USE_MOCK_DB === "true"
+      ? mockLines.find((l) => l.id === lineId)
+      : null;
+    if (!line) return { success: false, error: "Linha não encontrada" };
+    if (line.ownerDriverId !== driverId && line.driverId !== driverId) {
+      return { success: false, error: "Você não tem permissão para acessar esta linha" };
+    }
+
+    const passengerIds = new Set();
+    (line.pickupDropoffPoints || []).forEach((point) => {
+      normalizePassengerIds(point.passengers).forEach((id) => passengerIds.add(id));
+    });
+    return {
+      success: true,
+      passengers: [...passengerIds].map((id) => ({ id, name: id })),
+    };
+  } catch (error) {
+    return { success: false, error: `Erro ao listar passageiros: ${error.message}` };
+  }
+}
+
+async function enrichPointsWithPassengers(lineId, points) {
+  if (!points.length) return points;
+
+  const enrolledPassengerMap = await getEnrolledPassengerMap(lineId);
+
+  return points.map((point) => {
+    return {
+      ...point,
+      passengers: normalizePassengerIds(point.passengers).map(
+        (passengerId) =>
+          enrolledPassengerMap.get(passengerId) || {
+            id: passengerId,
+            name: passengerId,
+          },
+      ),
+    };
+  });
+}
+
+async function removePassengersFromOtherSegmentPoints(lineId, pointId, segment, passengerIds) {
+  const idsToMove = new Set(normalizePassengerIds(passengerIds));
+  if (!idsToMove.size) return;
+
+  if (shouldUseDatabase()) {
+    const otherPoints = await query(
+      `SELECT id, passengers
+         FROM line_points
+        WHERE line_id = $1 AND segment = $2 AND id <> $3`,
+      [lineId, segment, pointId],
+    );
+
+    await Promise.all(
+      otherPoints.rows.map((point) => {
+        const nextPassengers = normalizePassengerIds(point.passengers).filter(
+          (passengerId) => !idsToMove.has(passengerId),
+        );
+        return query(
+          `UPDATE line_points SET passengers = $1::jsonb WHERE id = $2`,
+          [JSON.stringify(nextPassengers), point.id],
+        );
+      }),
+    );
+  }
+}
+
+async function updatePointPassengers(lineId, pointId, passengerIds, driverId) {
+  try {
+    const normalizedPassengerIds = [...new Set(normalizePassengerIds(passengerIds))];
+
+    if (shouldUseDatabase()) {
+      const lineRes = await query(`SELECT owner_driver_id, driver_id FROM lines WHERE id = $1`, [lineId]);
+      if (!lineRes.rows[0]) return { success: false, error: "Linha não encontrada" };
+      const { owner_driver_id, driver_id } = lineRes.rows[0];
+      if (owner_driver_id !== driverId && driver_id !== driverId) {
+        return { success: false, error: "Você não tem permissão para gerenciar esta linha" };
+      }
+
+      const pointRes = await query(`SELECT id, segment FROM line_points WHERE id = $1 AND line_id = $2`, [pointId, lineId]);
+      if (!pointRes.rows[0]) return { success: false, error: "Ponto não encontrado" };
+
+      if (normalizedPassengerIds.length > 0) {
+        const enrolled = await query(
+          `SELECT passenger_id FROM line_enrollments WHERE line_id = $1 AND passenger_id = ANY($2::text[])`,
+          [lineId, normalizedPassengerIds],
+        );
+        if (enrolled.rows.length !== normalizedPassengerIds.length) {
+          return { success: false, error: "Só é possível vincular passageiros matriculados nesta linha" };
+        }
+      }
+
+      const res = await query(
+        `UPDATE line_points
+            SET passengers = $1::jsonb
+          WHERE id = $2 AND line_id = $3
+          RETURNING id, address, type, segment, passengers, latitude, longitude, place_id, created_at`,
+        [JSON.stringify(normalizedPassengerIds), pointId, lineId],
+      );
+      await removePassengersFromOtherSegmentPoints(lineId, pointId, pointRes.rows[0].segment, normalizedPassengerIds);
+      const enriched = await enrichPointsWithPassengers(lineId, [mapPointRowToDomain(res.rows[0])]);
+      return { success: true, point: enriched[0] };
+    }
+
+    const line = process.env.USE_MOCK_DB === "true"
+      ? mockLines.find((l) => l.id === lineId)
+      : null;
+    if (!line) return { success: false, error: "Linha não encontrada" };
+    if (line.ownerDriverId !== driverId && line.driverId !== driverId) {
+      return { success: false, error: "Você não tem permissão para gerenciar esta linha" };
+    }
+    const point = line.pickupDropoffPoints.find((p) => p.id === pointId);
+    if (!point) return { success: false, error: "Ponto não encontrado" };
+    point.passengers = normalizedPassengerIds;
+    const idsToMove = new Set(normalizedPassengerIds);
+    line.pickupDropoffPoints.forEach((otherPoint) => {
+      if (otherPoint.id === pointId || otherPoint.segment !== point.segment) return;
+      otherPoint.passengers = normalizePassengerIds(otherPoint.passengers).filter(
+        (passengerId) => !idsToMove.has(passengerId),
+      );
+    });
+    return { success: true, point };
+  } catch (error) {
+    return { success: false, error: `Erro ao atualizar passageiros do ponto: ${error.message}` };
+  }
+}
+
 async function getPointsByLineId(lineId) {
   if (!shouldUseDatabase()) return [];
   const result = await query(
@@ -51,7 +236,7 @@ async function getPointsByLineId(lineId) {
      FROM line_points WHERE line_id = $1 ORDER BY created_at ASC`,
     [lineId],
   );
-  return result.rows.map(mapPointRowToDomain);
+  return enrichPointsWithPassengers(lineId, result.rows.map(mapPointRowToDomain));
 }
 
 /**
@@ -193,6 +378,7 @@ async function addPickupDropoffPoint(lineId, pointData, driverId) {
           pointData.placeId ?? null,
         ],
       );
+      await removePassengersFromOtherSegmentPoints(lineId, id, pointData.segment || "ida", passengers);
       return { success: true, point: mapPointRowToDomain(res.rows[0]) };
     }
 
@@ -205,6 +391,15 @@ async function addPickupDropoffPoint(lineId, pointData, driverId) {
       createdAt: new Date().toISOString(),
     };
     line.pickupDropoffPoints.push(newPoint);
+    const idsToMove = new Set(passengers);
+    if (idsToMove.size) {
+      line.pickupDropoffPoints.forEach((point) => {
+        if (point.id === newPoint.id || point.segment !== newPoint.segment) return;
+        point.passengers = normalizePassengerIds(point.passengers).filter(
+          (passengerId) => !idsToMove.has(passengerId),
+        );
+      });
+    }
     return { success: true, point: newPoint };
   } catch (error) {
     return { success: false, error: `Erro ao adicionar ponto: ${error.message}` };
@@ -461,6 +656,8 @@ module.exports = {
   addPickupDropoffPoint,
   updatePickupDropoffPoint,
   removePickupDropoffPoint,
+  listLinePassengers,
+  updatePointPassengers,
   getLineById,
   getLinesByDriver,
   hasActiveLineByVehicleId,

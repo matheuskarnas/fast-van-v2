@@ -59,10 +59,17 @@ async function createGeofenceLine(lineData) {
     };
   }
 
-  if (getLine(lineId)) {
+  const existingLine = getLine(lineId);
+  if (existingLine) {
+    existingLine.ownerDriverId = ownerDriverId;
+    existingLine.driverId = driverId || null;
+    existingLine.authorizedDriverIds = [ownerDriverId, driverId].filter(Boolean);
+    existingLine.nextDate = nextDate || null;
+    existingLine.points = points.map((point) => ({ ...point }));
+
     return {
-      success: false,
-      error: "Linha já cadastrada",
+      success: true,
+      lineId,
     };
   }
 
