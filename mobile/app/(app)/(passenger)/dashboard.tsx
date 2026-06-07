@@ -21,8 +21,11 @@ import { updateMyPresenceStatus, type PresenceStatus } from "../../../services/p
 interface PaymentStatus {
   lineId: string;
   lineName?: string;
-  amount?: number;
+  amount?: number | null;
   status: "paid" | "pending";
+  displayStatus?: "paid" | "pending" | "overdue";
+  dueDay?: number | null;
+  dueDate?: string | null;
 }
 
 interface ActiveLine {
@@ -263,12 +266,30 @@ export default function PassengerDashboardScreen() {
             {/* Status real de pagamento */}
             {(() => {
               const pay = payments.find((p) => p.lineId === line.lineId);
-              const isPaid = !pay || pay.status === "paid";
+              const displayStatus = pay?.displayStatus ?? pay?.status;
+              const color = displayStatus === "paid"
+                ? theme.colors.feedback.success
+                : displayStatus === "overdue"
+                  ? theme.colors.feedback.error
+                  : theme.colors.feedback.warning;
+              const label = !pay || !pay.amount
+                ? "Mensalidade não configurada"
+                : displayStatus === "paid"
+                  ? "Mensalidade em dia"
+                  : displayStatus === "overdue"
+                    ? "Mensalidade em atraso"
+                    : "Mensalidade pendente";
               return (
-                <View style={[styles.slotBadge, { backgroundColor: (isPaid ? theme.colors.feedback.success : theme.colors.feedback.warning) + "15", borderColor: (isPaid ? theme.colors.feedback.success : theme.colors.feedback.warning) + "40" }]}>
-                  <Ionicons name={isPaid ? "checkmark-circle-outline" : "time-outline"} size={12} color={isPaid ? theme.colors.feedback.success : theme.colors.feedback.warning} />
-                  <Text style={[styles.slotText, { color: isPaid ? theme.colors.feedback.success : theme.colors.feedback.warning }]}>
-                    {isPaid ? "Mensalidade em dia" : `Mensalidade pendente${pay?.amount ? ` · R$ ${pay.amount.toFixed(2)}` : ""}`}
+                <View style={[styles.slotBadge, { backgroundColor: color + "15", borderColor: color + "40" }]}>
+                  <Ionicons
+                    name={displayStatus === "paid" ? "checkmark-circle-outline" : displayStatus === "overdue" ? "alert-circle-outline" : "time-outline"}
+                    size={12}
+                    color={color}
+                  />
+                  <Text style={[styles.slotText, { color }]}>
+                    {label}
+                    {pay?.amount ? ` · R$ ${pay.amount.toFixed(2)}` : ""}
+                    {pay?.dueDay ? ` · vence dia ${pay.dueDay}` : ""}
                   </Text>
                 </View>
               );

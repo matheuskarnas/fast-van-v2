@@ -34,7 +34,7 @@ router.get("/lines/:lineId/payments", requireAuth, async (req, res, next) => {
   try {
     if (!driverOnly(req, res)) return;
     const month = req.query.month || new Date().toISOString().slice(0, 7);
-    const result = await getLinePayments(req.params.lineId, month);
+    const result = await getLinePayments(req.params.lineId, month, req.auth.id);
     if (!result.success) return res.status(400).json({ success: false, error: { code: "FINANCE_ERROR", message: result.error } });
     return res.status(200).json(result);
   } catch (e) { return next(e); }
@@ -45,8 +45,8 @@ router.put("/lines/:lineId/payments/:passengerId", requireAuth, async (req, res,
   try {
     if (!driverOnly(req, res)) return;
     const { lineId, passengerId } = req.params;
-    const { amount, month, status, notes } = req.body || {};
-    const result = await upsertPayment({ lineId, passengerId, amount, month, status, notes });
+    const { amount, month, status, dueDay, paidAt, notes } = req.body || {};
+    const result = await upsertPayment({ lineId, passengerId, amount, month, status, dueDay, paidAt, notes, driverId: req.auth.id });
     if (!result.success) return res.status(400).json({ success: false, error: { code: "PAYMENT_ERROR", message: result.error } });
     return res.status(200).json(result);
   } catch (e) { return next(e); }
