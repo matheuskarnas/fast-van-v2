@@ -51,6 +51,15 @@ export default function DriverLayout() {
         }}
       />
       <Tabs.Screen
+        name="marketplace"
+        options={{
+          title: "Market",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="storefront-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="earnings"
         options={{
           title: "Ganhos",

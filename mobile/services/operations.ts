@@ -25,6 +25,7 @@ export interface RoutePoint {
   latitude?: number | null;
   longitude?: number | null;
   placeId?: string | null;
+  sortOrder?: number | null;
   confirmedPassengerIds?: string[];
 }
 

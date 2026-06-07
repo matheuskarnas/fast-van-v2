@@ -23,7 +23,9 @@ function mapLineRowToDomain(row, points = []) {
     driverId: row.driver_id || null,
     arrivalTimes: row.arrival_times || [],
     departureTimes: row.departure_times || [],
+    daysOfWeek: row.days_of_week || "seg,ter,qua,qui,sex",
     capacity: row.capacity,
+    marketplaceEnabled: row.marketplace_enabled ?? false,
     pickupDropoffPoints: points,
     createdAt: row.created_at,
   };
@@ -290,6 +292,8 @@ async function createLine(lineData, ownerDriverId) {
       vehicleCapacity = matchedVehicle.capacity || 16;
     }
 
+    const daysOfWeek = lineData.daysOfWeek || "seg,ter,qua,qui,sex";
+
     const newLine = {
       id: `line-${++lineIdCounter}`,
       name: lineData.name.trim(),
@@ -300,6 +304,7 @@ async function createLine(lineData, ownerDriverId) {
       driverId: lineData.driverId || null,
       arrivalTimes: lineData.arrivalTimes,
       departureTimes: lineData.departureTimes,
+      daysOfWeek,
       pickupDropoffPoints: [],
       capacity: vehicleCapacity,
       createdAt: new Date().toISOString(),
@@ -308,8 +313,8 @@ async function createLine(lineData, ownerDriverId) {
     if (shouldUseDatabase()) {
       const id = `line_${Date.now()}`;
       await query(
-        `INSERT INTO lines (id, name, line_name, owner_driver_id, driver_id, vehicle_id, origin_city, destination_place, destination_city, arrival_times, departure_times, capacity)
-         VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10)`,
+        `INSERT INTO lines (id, name, line_name, owner_driver_id, driver_id, vehicle_id, origin_city, destination_place, destination_city, arrival_times, departure_times, days_of_week, capacity)
+         VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10, $11)`,
         [
           id,
           newLine.name,
@@ -320,6 +325,7 @@ async function createLine(lineData, ownerDriverId) {
           newLine.destinationPlace,
           JSON.stringify(newLine.arrivalTimes),
           JSON.stringify(newLine.departureTimes),
+          newLine.daysOfWeek,
           vehicleCapacity,
         ],
       );
@@ -652,6 +658,114 @@ async function getLinesByDriver(driverId) {
   }
 }
 
+function mapMarketplaceLineRow(row) {
+  return {
+    id: row.id,
+    name: row.name || row.line_name || "",
+    originCity: row.origin_city,
+    destinationPlace: row.destination_place || row.destination_city || "",
+    ownerDriverId: row.owner_driver_id,
+    ownerDriverName: row.owner_driver_name,
+    arrivalTimes: row.arrival_times || [],
+    departureTimes: row.departure_times || [],
+    daysOfWeek: row.days_of_week || "seg,ter,qua,qui,sex",
+    capacity: row.capacity,
+    passengerCount: row.passenger_count ?? 0,
+    availableSeats: Math.max(0, (row.capacity ?? 0) - (row.passenger_count ?? 0)),
+    marketplaceEnabled: row.marketplace_enabled ?? false,
+    createdAt: row.created_at,
+  };
+}
+
+async function listMarketplaceLines({ originCity = null, destination = null } = {}) {
+  try {
+    if (shouldUseDatabase()) {
+      const params = [];
+      const conditions = ["l.marketplace_enabled = TRUE"];
+      if (originCity) {
+        params.push(`%${originCity}%`);
+        conditions.push(`LOWER(l.origin_city) LIKE LOWER($${params.length})`);
+      }
+      if (destination) {
+        params.push(`%${destination}%`);
+        conditions.push(`LOWER(l.destination_place) LIKE LOWER($${params.length})`);
+      }
+      const res = await query(
+        `SELECT l.*,
+                u.name AS owner_driver_name,
+                COUNT(e.passenger_id)::int AS passenger_count
+           FROM lines l
+           LEFT JOIN users u ON u.id = l.owner_driver_id
+           LEFT JOIN line_enrollments e ON e.line_id = l.id
+          WHERE ${conditions.join(" AND ")}
+          GROUP BY l.id, u.name
+          ORDER BY l.created_at DESC`,
+        params,
+      );
+      return { success: true, lines: res.rows.map(mapMarketplaceLineRow) };
+    }
+
+    const lines = process.env.USE_MOCK_DB === "true"
+      ? mockLines.filter((line) => line.marketplaceEnabled)
+      : [];
+    return { success: true, lines };
+  } catch (error) {
+    return { success: false, error: `Erro ao listar linhas anunciadas: ${error.message}` };
+  }
+}
+
+async function listDriverMarketplaceLines(driverId) {
+  try {
+    if (shouldUseDatabase()) {
+      const res = await query(
+        `SELECT l.*,
+                u.name AS owner_driver_name,
+                COUNT(e.passenger_id)::int AS passenger_count
+           FROM lines l
+           LEFT JOIN users u ON u.id = l.owner_driver_id
+           LEFT JOIN line_enrollments e ON e.line_id = l.id
+          WHERE l.owner_driver_id = $1 OR l.driver_id = $1
+          GROUP BY l.id, u.name
+          ORDER BY l.created_at DESC`,
+        [driverId],
+      );
+      return { success: true, lines: res.rows.map(mapMarketplaceLineRow) };
+    }
+
+    const lines = process.env.USE_MOCK_DB === "true"
+      ? mockLines.filter((line) => line.ownerDriverId === driverId || line.driverId === driverId)
+      : [];
+    return { success: true, lines };
+  } catch (error) {
+    return { success: false, error: `Erro ao listar suas linhas: ${error.message}` };
+  }
+}
+
+async function updateLineMarketplaceStatus(lineId, driverId, enabled) {
+  try {
+    if (shouldUseDatabase()) {
+      const res = await query(
+        `UPDATE lines
+            SET marketplace_enabled = $1
+          WHERE id = $2 AND (owner_driver_id = $3 OR driver_id = $3)
+          RETURNING *`,
+        [Boolean(enabled), lineId, driverId],
+      );
+      if (!res.rows[0]) return { success: false, error: "Linha não encontrada ou sem permissão" };
+      return { success: true, line: mapLineRowToDomain(res.rows[0]) };
+    }
+
+    const line = process.env.USE_MOCK_DB === "true"
+      ? mockLines.find((l) => l.id === lineId && (l.ownerDriverId === driverId || l.driverId === driverId))
+      : null;
+    if (!line) return { success: false, error: "Linha não encontrada ou sem permissão" };
+    line.marketplaceEnabled = Boolean(enabled);
+    return { success: true, line };
+  } catch (error) {
+    return { success: false, error: `Erro ao atualizar anúncio da linha: ${error.message}` };
+  }
+}
+
 /**
  * Verifica se um veículo possui linha ativa vinculada
  */
@@ -758,6 +872,9 @@ module.exports = {
   reorderLinePoints,
   getLineById,
   getLinesByDriver,
+  listMarketplaceLines,
+  listDriverMarketplaceLines,
+  updateLineMarketplaceStatus,
   hasActiveLineByVehicleId,
   attachDriverToLine,
   removeLine,

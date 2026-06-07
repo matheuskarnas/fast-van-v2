@@ -8,6 +8,12 @@ export default function SharedLayout() {
       }}
     >
       <Stack.Screen
+        name="marketplace"
+        options={{
+          title: 'Marketplace',
+        }}
+      />
+      <Stack.Screen
         name="alerts"
         options={{
           title: 'Alertas',

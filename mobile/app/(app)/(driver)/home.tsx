@@ -113,17 +113,10 @@ export default function DriverHomeScreen() {
         )}
       </View>
 
-      <Link href={"/(app)/shared/marketplace-events" as any} asChild>
+      <Link href={"/(app)/shared/marketplace" as any} asChild>
         <ActionCard
-          title="Eventos esporádicos"
-          description="Veja demandas de transporte para shows, jogos e eventos."
-        />
-      </Link>
-
-      <Link href={"/(app)/shared/marketplace-b2b" as any} asChild>
-        <ActionCard
-          title="Marketplace B2B"
-          description="Veja solicitações de transporte de empresas e entre em contato."
+          title="Marketplace"
+          description="Anuncie linhas e veja demandas de eventos ou empresas."
         />
       </Link>
 

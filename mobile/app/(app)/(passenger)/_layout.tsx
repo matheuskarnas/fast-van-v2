@@ -42,6 +42,15 @@ export default function PassengerLayout() {
         }}
       />
       <Tabs.Screen
+        name="marketplace"
+        options={{
+          title: "Market",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="storefront-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="chat"
         options={{
           title: "Chat",

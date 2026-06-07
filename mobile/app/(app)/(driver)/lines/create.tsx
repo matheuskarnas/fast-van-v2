@@ -27,6 +27,16 @@ interface Vehicle {
   capacity: number;
 }
 
+const DAY_OPTIONS = [
+  { key: "seg", label: "Seg" },
+  { key: "ter", label: "Ter" },
+  { key: "qua", label: "Qua" },
+  { key: "qui", label: "Qui" },
+  { key: "sex", label: "Sex" },
+  { key: "sab", label: "Sáb" },
+  { key: "dom", label: "Dom" },
+] as const;
+
 function formatTime(date: Date): string {
   return date.toTimeString().slice(0, 5);
 }
@@ -52,6 +62,7 @@ export default function CreateLineScreen() {
 
   const [arrivalTimes, setArrivalTimes] = useState<string[]>([]);
   const [departureTimes, setDepartureTimes] = useState<string[]>([]);
+  const [daysOfWeek, setDaysOfWeek] = useState("seg,ter,qua,qui,sex");
 
   const [showPicker, setShowPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<"arrival" | "departure">("arrival");
@@ -130,11 +141,25 @@ export default function CreateLineScreen() {
     setList(list.filter((t) => t !== time));
   };
 
+  const toggleDay = (day: string) => {
+    setDaysOfWeek((current) => {
+      const selected = current.split(",").filter(Boolean);
+      const next = selected.includes(day)
+        ? selected.filter((item) => item !== day)
+        : [...selected, day];
+      return DAY_OPTIONS
+        .map((option) => option.key)
+        .filter((key) => next.includes(key))
+        .join(",");
+    });
+  };
+
   const handleSubmit = async () => {
     if (!lineName.trim()) { Alert.alert("Atenção", "Informe o nome da linha."); return; }
     if (!originCity) { Alert.alert("Atenção", "Selecione a cidade de origem."); return; }
     if (!destinationPlace) { Alert.alert("Atenção", "Selecione o destino."); return; }
     if (!selectedVehicle) { Alert.alert("Atenção", "Selecione um veículo."); return; }
+    if (!daysOfWeek) { Alert.alert("Atenção", "Selecione pelo menos um dia de operação."); return; }
     if (arrivalTimes.length === 0) { Alert.alert("Atenção", "Informe pelo menos um horário de chegada."); return; }
     if (departureTimes.length === 0) { Alert.alert("Atenção", "Informe pelo menos um horário de saída."); return; }
 
@@ -146,6 +171,7 @@ export default function CreateLineScreen() {
       vehicleId: selectedVehicle.id,
       arrivalTimes,
       departureTimes,
+      daysOfWeek,
     });
     setSubmitting(false);
 
@@ -279,6 +305,25 @@ export default function CreateLineScreen() {
               )}
             </>
           )}
+
+          {/* Dias de operação */}
+          <Text style={styles.label}>Dias de operação</Text>
+          <View style={styles.dayGrid}>
+            {DAY_OPTIONS.map((day) => {
+              const selected = daysOfWeek.split(",").includes(day.key);
+              return (
+                <Pressable
+                  key={day.key}
+                  style={[styles.dayButton, selected && styles.dayButtonActive]}
+                  onPress={() => toggleDay(day.key)}
+                >
+                  <Text style={[styles.dayButtonText, selected && styles.dayButtonTextActive]}>
+                    {day.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
 
           {/* Horários de chegada */}
           <Text style={styles.label}>Horários de chegada no destino</Text>
@@ -417,6 +462,33 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
   },
   selectedChipText: { flex: 1, fontSize: theme.font.md, color: theme.colors.text.primary, fontWeight: "600" },
+  dayGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.sm,
+  },
+  dayButton: {
+    width: 58,
+    minHeight: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.radius.md,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border.default,
+    backgroundColor: theme.colors.background.card,
+  },
+  dayButtonActive: {
+    borderColor: theme.colors.brand.orange,
+    backgroundColor: theme.colors.brand.orange,
+  },
+  dayButtonText: {
+    fontSize: theme.font.sm,
+    fontWeight: "800",
+    color: theme.colors.text.secondary,
+  },
+  dayButtonTextActive: {
+    color: theme.colors.text.inverse,
+  },
   timeChips: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
   timeChip: {
     flexDirection: "row",

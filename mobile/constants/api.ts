@@ -63,6 +63,9 @@ export const ApiEndpoints = {
   // Driver Dashboard (RF15/30)
   GET_DRIVER_DASHBOARD: `${API_URL}/api/v1/driver/dashboard`,
   // Marketplace B2B (RF10/11)
+  LIST_MARKETPLACE_LINES: `${API_URL}/api/v1/marketplace/lines`,
+  LIST_MY_MARKETPLACE_LINES: `${API_URL}/api/v1/marketplace/lines/mine`,
+  UPDATE_MARKETPLACE_LINE: `${API_URL}/api/v1/marketplace/lines/:id`,
   CREATE_B2B_REQUEST: `${API_URL}/api/v1/marketplace/b2b`,
   LIST_B2B_REQUESTS: `${API_URL}/api/v1/marketplace/b2b`,
   LIST_MY_B2B_REQUESTS: `${API_URL}/api/v1/marketplace/b2b/mine`,

@@ -2,8 +2,41 @@ const express = require("express");
 const { requireAuth } = require("../middlewares/authMiddleware");
 const { createB2bRequest, listOpenB2bRequests, listMyB2bRequests, updateB2bRequestStatus } = require("../services/b2bService");
 const { createEventRequest, listEventRequests, listMyEventRequests, addInterest, closeEventRequest } = require("../services/eventService");
+const { listMarketplaceLines, listDriverMarketplaceLines, updateLineMarketplaceStatus } = require("../services/lineService");
 
 const router = express.Router();
+
+// Linhas regulares anunciadas por motoristas
+router.get("/lines", requireAuth, async (req, res, next) => {
+  try {
+    const { originCity, destination } = req.query;
+    const result = await listMarketplaceLines({ originCity, destination });
+    if (!result.success) return res.status(400).json({ success: false, error: { code: "MARKETPLACE_LINES_ERROR", message: result.error } });
+    return res.status(200).json(result);
+  } catch (e) { return next(e); }
+});
+
+router.get("/lines/mine", requireAuth, async (req, res, next) => {
+  try {
+    if (req.auth.role !== "DRIVER") {
+      return res.status(403).json({ success: false, error: { code: "FORBIDDEN_RESOURCE", message: "Somente motoristas podem anunciar linhas" } });
+    }
+    const result = await listDriverMarketplaceLines(req.auth.id);
+    if (!result.success) return res.status(400).json({ success: false, error: { code: "MARKETPLACE_LINES_ERROR", message: result.error } });
+    return res.status(200).json(result);
+  } catch (e) { return next(e); }
+});
+
+router.patch("/lines/:id", requireAuth, async (req, res, next) => {
+  try {
+    if (req.auth.role !== "DRIVER") {
+      return res.status(403).json({ success: false, error: { code: "FORBIDDEN_RESOURCE", message: "Somente motoristas podem anunciar linhas" } });
+    }
+    const result = await updateLineMarketplaceStatus(req.params.id, req.auth.id, req.body?.enabled);
+    if (!result.success) return res.status(400).json({ success: false, error: { code: "MARKETPLACE_LINE_UPDATE_ERROR", message: result.error } });
+    return res.status(200).json(result);
+  } catch (e) { return next(e); }
+});
 
 // RF10: Criar solicitação B2B (qualquer PASSENGER)
 router.post("/b2b", requireAuth, async (req, res, next) => {

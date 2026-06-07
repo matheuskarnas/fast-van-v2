@@ -22,6 +22,7 @@ export interface Line {
   capacity: number;
   arrivalTimes: string[];
   departureTimes: string[];
+  daysOfWeek?: string;
   points: LinePoint[];
   ownerDriverId: string;
   driverId?: string;
@@ -42,6 +43,7 @@ export interface CreateLinePayload {
   vehicleId: string;
   arrivalTimes: string[];
   departureTimes: string[];
+  daysOfWeek: string;
 }
 
 export interface AddPointPayload {
