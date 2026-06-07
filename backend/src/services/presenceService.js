@@ -745,7 +745,8 @@ async function getPassengerSummary(passengerId) {
     // Active lines
     const linesRes = await query(
       `SELECT e.line_id, e.departure_time, e.arrival_time,
-              l.name, l.origin_city, l.destination_place, l.capacity
+              l.name, l.origin_city, l.destination_place, l.capacity,
+              l.owner_driver_id, l.driver_id, l.vehicle_id
        FROM line_enrollments e
        JOIN lines l ON l.id = e.line_id
        WHERE e.passenger_id = $1`,
@@ -771,6 +772,9 @@ async function getPassengerSummary(passengerId) {
       capacity: r.capacity,
       departureTime: r.departure_time,
       arrivalTime: r.arrival_time,
+      driverId: r.driver_id || r.owner_driver_id,
+      ownerDriverId: r.owner_driver_id,
+      vehicleId: r.vehicle_id,
     }));
 
     const buildRange = (from, to) =>
@@ -784,8 +788,6 @@ async function getPassengerSummary(passengerId) {
       );
 
     const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
-    const tomorrow = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
-
     return {
       success: true,
       lines,

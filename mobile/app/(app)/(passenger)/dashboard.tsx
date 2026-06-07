@@ -32,6 +32,9 @@ interface ActiveLine {
   destinationPlace?: string;
   departureTime?: string | null;
   arrivalTime?: string | null;
+  driverId?: string | null;
+  ownerDriverId?: string | null;
+  vehicleId?: string | null;
 }
 
 interface PresenceEntry {
@@ -235,7 +238,15 @@ export default function PassengerDashboardScreen() {
             <View style={styles.quickActions}>
               <Pressable
                 style={styles.rateBtn}
-                onPress={() => (router as any).push({ pathname: "/(app)/(passenger)/rate", params: { lineId: line.lineId, lineName: line.name } })}
+                onPress={() => (router as any).push({
+                  pathname: "/(app)/(passenger)/rate",
+                  params: {
+                    lineId: line.lineId,
+                    lineName: line.name,
+                    driverId: line.driverId || line.ownerDriverId,
+                    vehicleId: line.vehicleId,
+                  },
+                })}
               >
                 <Ionicons name="star-outline" size={13} color={theme.colors.brand.orange} />
                 <Text style={styles.rateBtnText}>Avaliar</Text>

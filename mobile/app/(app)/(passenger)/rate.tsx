@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -48,7 +48,7 @@ function StarRow({ label, value, onChange }: { label: string; value: number; onC
 }
 
 export default function RateScreen() {
-  const { lineId, driverId, vehicleId, lineName } = useLocalSearchParams<{
+  const { lineId, driverId: initialDriverId, vehicleId: initialVehicleId, lineName } = useLocalSearchParams<{
     lineId: string;
     driverId: string;
     vehicleId?: string;
@@ -57,6 +57,8 @@ export default function RateScreen() {
   const router = useRouter();
 
   const month = new Date().toISOString().slice(0, 7);
+  const [driverId, setDriverId] = useState(initialDriverId ?? "");
+  const [vehicleId, setVehicleId] = useState(initialVehicleId ?? "");
 
   const [scores, setScores] = useState<Record<string, number>>({
     punctuality: 5, driving: 5, friendliness: 5,
@@ -64,10 +66,50 @@ export default function RateScreen() {
   });
   const [comment, setComment] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loadingLine, setLoadingLine] = useState(!initialDriverId);
 
   const setScore = (key: string, val: number) => setScores((prev) => ({ ...prev, [key]: val }));
 
+  useEffect(() => {
+    if (initialDriverId || !lineId) {
+      setLoadingLine(false);
+      return;
+    }
+
+    let active = true;
+    async function loadLineContext() {
+      setLoadingLine(true);
+      try {
+        const response = await apiService.get<{
+          success: boolean;
+          lines?: {
+            lineId: string;
+            driverId?: string | null;
+            ownerDriverId?: string | null;
+            vehicleId?: string | null;
+          }[];
+        }>(ApiEndpoints.GET_MY_SUMMARY);
+        const line = response.data.lines?.find((item) => item.lineId === lineId);
+        if (active && line) {
+          setDriverId(line.driverId || line.ownerDriverId || "");
+          setVehicleId(line.vehicleId || "");
+        }
+      } catch {
+        // O envio exibirá a mensagem de dados incompletos.
+      } finally {
+        if (active) setLoadingLine(false);
+      }
+    }
+
+    loadLineContext();
+    return () => { active = false; };
+  }, [initialDriverId, lineId]);
+
   const handleSubmit = async () => {
+    if (!lineId || !driverId) {
+      Alert.alert("Erro", "Não foi possível identificar a linha e o motorista para avaliação.");
+      return;
+    }
     setSaving(true);
     try {
       const res = await apiService.post<{ success: boolean; error?: { message?: string } }>(
@@ -100,6 +142,13 @@ export default function RateScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
+        {loadingLine && (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="small" color={theme.colors.brand.orange} />
+            <Text style={styles.loadingText}>Carregando dados da linha...</Text>
+          </View>
+        )}
+
         <Text style={styles.sectionTitle}>Motorista</Text>
         <View style={styles.card}>
           {DRIVER_CRITERIA.map((c) => (
@@ -130,7 +179,7 @@ export default function RateScreen() {
         <Pressable
           style={[styles.submitBtn, saving && styles.btnDisabled]}
           onPress={handleSubmit}
-          disabled={saving}
+          disabled={saving || loadingLine}
         >
           {saving
             ? <ActivityIndicator color="#fff" />
@@ -150,6 +199,17 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: theme.font.lg, fontWeight: "800", color: theme.colors.text.primary },
   headerSub: { fontSize: theme.font.sm, color: theme.colors.text.secondary },
   content: { padding: theme.spacing.lg, gap: theme.spacing.md },
+  loadingBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.sm,
+    backgroundColor: theme.colors.background.card,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border.soft,
+    padding: theme.spacing.md,
+  },
+  loadingText: { fontSize: theme.font.sm, color: theme.colors.text.secondary },
   sectionTitle: { fontSize: theme.font.sm, fontWeight: "700", color: theme.colors.text.secondary, textTransform: "uppercase", letterSpacing: 0.8 },
   card: { backgroundColor: theme.colors.background.card, borderRadius: theme.radius.lg, padding: theme.spacing.lg, gap: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border.soft },
   starRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },

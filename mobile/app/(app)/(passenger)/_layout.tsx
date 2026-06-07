@@ -70,6 +70,12 @@ export default function PassengerLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="rate"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
