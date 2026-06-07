@@ -2,7 +2,6 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Modal,
   Pressable,
   SafeAreaView,
@@ -15,6 +14,7 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import DraggableFlatList from "react-native-draggable-flatlist";
 import { theme } from "../../../../../constants/theme";
 import { apiService } from "../../../../../services/api";
 import { ApiEndpoints } from "../../../../../constants/api";
@@ -23,6 +23,7 @@ import {
   getLinePassengers,
   generateLineInvite,
   removeLinePoint,
+  reorderLinePoints,
   updateLinePointPassengers,
   type Line,
   type LinePassenger,
@@ -41,6 +42,8 @@ export default function LineDetailsScreen() {
   const [loadingPassengers, setLoadingPassengers] = useState(false);
   const [savingPassengers, setSavingPassengers] = useState(false);
   const [pendingSuggestionsCount, setPendingSuggestionsCount] = useState(0);
+  const [activePointSegment, setActivePointSegment] = useState<"ida" | "volta">("ida");
+  const [savingOrder, setSavingOrder] = useState(false);
 
   const loadLine = useCallback(async () => {
     if (!lineId) return;
@@ -152,6 +155,26 @@ export default function LineDetailsScreen() {
     }
   };
 
+  const handleReorderPoints = async (points: LinePoint[]) => {
+    if (!lineId || !line) return;
+    const orderedPoints = points.map((point, index) => ({ ...point, sortOrder: index }));
+    setLine({
+      ...line,
+      points: [
+        ...orderedPoints,
+        ...(line.points ?? []).filter((point) => point.segment !== activePointSegment),
+      ].sort(compareLinePoints),
+    });
+
+    setSavingOrder(true);
+    const result = await reorderLinePoints(lineId, activePointSegment, orderedPoints.map((point) => point.id));
+    setSavingOrder(false);
+    if (!result.success) {
+      Alert.alert("Erro", result.error?.message ?? "Não foi possível salvar a ordem dos pontos.");
+      loadLine();
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -163,6 +186,8 @@ export default function LineDetailsScreen() {
   }
 
   if (!line) return null;
+
+  const segmentPoints = getOrderedSegmentPoints(line.points ?? [], activePointSegment);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -176,9 +201,11 @@ export default function LineDetailsScreen() {
         </View>
       </View>
 
-      <FlatList
-        data={line.points ?? []}
+      <DraggableFlatList
+        data={segmentPoints}
         keyExtractor={(item) => item.id}
+        activationDistance={10}
+        onDragEnd={({ data }) => handleReorderPoints(data)}
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <>
@@ -234,16 +261,42 @@ export default function LineDetailsScreen() {
               </Pressable>
             </View>
 
-            <Text style={styles.sectionTitle}>Pontos de embarque/desembarque</Text>
-            {(line.points?.length ?? 0) === 0 && (
-              <Text style={styles.emptyPoints}>Nenhum ponto cadastrado. Adicione os pontos conforme os passageiros entram na linha.</Text>
+            <View style={styles.pointsHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Ordem das paradas</Text>
+                <Text style={styles.sectionHint}>
+                  {savingOrder ? "Salvando ordem..." : "Arraste o ponto pelo ícone para mudar a sequência."}
+                </Text>
+              </View>
+              <View style={styles.segmentTabs}>
+                {(["ida", "volta"] as const).map((segment) => {
+                  const isActive = activePointSegment === segment;
+                  return (
+                    <Pressable
+                      key={segment}
+                      style={[styles.segmentTab, isActive && styles.segmentTabActive]}
+                      onPress={() => setActivePointSegment(segment)}
+                    >
+                      <Text style={[styles.segmentTabText, isActive && styles.segmentTabTextActive]}>
+                        {segment === "ida" ? "Ida" : "Volta"}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+            {segmentPoints.length === 0 && (
+              <Text style={styles.emptyPoints}>Nenhum ponto cadastrado para este trecho.</Text>
             )}
           </>
         }
-        renderItem={({ item }) => (
+        renderItem={({ item, drag, isActive, getIndex }) => (
           <PointCard
             point={item}
-            onEdit={() => router.push({ pathname: `/lines/${lineId}/point`, params: { pointId: item.id, address: item.address, type: item.type, segment: item.segment } })}
+            orderNumber={(getIndex() ?? 0) + 1}
+            onDrag={drag}
+            isDragging={isActive}
+            onEdit={() => (router as any).push({ pathname: `/lines/${lineId}/point`, params: { pointId: item.id, address: item.address, type: item.type, segment: item.segment } })}
             onManagePassengers={() => openPassengerManager(item)}
             onRemove={() => handleRemovePoint(item)}
           />
@@ -343,6 +396,18 @@ function getPointPassengerIds(point: LinePoint) {
   return (point.passengers ?? []).map(getPassengerId).filter(Boolean);
 }
 
+function compareLinePoints(a: LinePoint, b: LinePoint) {
+  if (a.segment !== b.segment) return a.segment.localeCompare(b.segment);
+  const orderA = a.sortOrder ?? Number.MAX_SAFE_INTEGER;
+  const orderB = b.sortOrder ?? Number.MAX_SAFE_INTEGER;
+  if (orderA !== orderB) return orderA - orderB;
+  return a.id.localeCompare(b.id);
+}
+
+function getOrderedSegmentPoints(points: LinePoint[], segment: "ida" | "volta") {
+  return points.filter((point) => point.segment === segment).sort(compareLinePoints);
+}
+
 function InfoRow({ icon, color, label, value }: { icon: string; color: string; label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
@@ -353,12 +418,34 @@ function InfoRow({ icon, color, label, value }: { icon: string; color: string; l
   );
 }
 
-function PointCard({ point, onEdit, onManagePassengers, onRemove }: { point: LinePoint; onEdit: () => void; onManagePassengers: () => void; onRemove: () => void }) {
+function PointCard({
+  point,
+  orderNumber,
+  onDrag,
+  isDragging,
+  onEdit,
+  onManagePassengers,
+  onRemove,
+}: {
+  point: LinePoint;
+  orderNumber: number;
+  onDrag: () => void;
+  isDragging: boolean;
+  onEdit: () => void;
+  onManagePassengers: () => void;
+  onRemove: () => void;
+}) {
   const isPickup = point.type === "pickup";
   const passengerNames = (point.passengers ?? []).map(getPassengerName);
   return (
-    <View style={styles.pointCard}>
+    <View style={[styles.pointCard, isDragging && styles.pointCardDragging]}>
       <View style={styles.pointType}>
+        <Pressable style={styles.dragHandle} onLongPress={onDrag} delayLongPress={120}>
+          <Ionicons name="reorder-three-outline" size={22} color={theme.colors.text.secondary} />
+        </Pressable>
+        <View style={styles.orderBadge}>
+          <Text style={styles.orderBadgeText}>{orderNumber}</Text>
+        </View>
         <Ionicons name={isPickup ? "arrow-up-circle" : "arrow-down-circle"} size={20} color={isPickup ? theme.colors.feedback.success : theme.colors.feedback.error} />
         <Text style={styles.pointTypeText}>{isPickup ? "Embarque" : "Desembarque"}</Text>
         <Text style={styles.pointSegment}>{point.segment === "ida" ? "Ida" : "Volta"}</Text>
@@ -460,7 +547,37 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: theme.colors.text.inverse,
   },
+  pointsHeader: {
+    gap: theme.spacing.sm,
+  },
   sectionTitle: { fontSize: theme.font.md, fontWeight: "700", color: theme.colors.text.primary },
+  sectionHint: { fontSize: theme.font.sm, color: theme.colors.text.secondary, marginTop: 2 },
+  segmentTabs: {
+    flexDirection: "row",
+    padding: 3,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.background.muted,
+  },
+  segmentTab: {
+    flex: 1,
+    minHeight: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.radius.sm,
+  },
+  segmentTabActive: {
+    backgroundColor: theme.colors.background.card,
+    borderWidth: 1,
+    borderColor: theme.colors.border.soft,
+  },
+  segmentTabText: {
+    fontSize: theme.font.sm,
+    fontWeight: "700",
+    color: theme.colors.text.secondary,
+  },
+  segmentTabTextActive: {
+    color: theme.colors.brand.navy,
+  },
   emptyPoints: { fontSize: theme.font.sm, color: theme.colors.text.secondary, lineHeight: 20 },
   pointCard: {
     backgroundColor: theme.colors.background.card,
@@ -471,7 +588,32 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
     ...theme.shadow.card,
   },
+  pointCardDragging: {
+    opacity: 0.9,
+    borderColor: theme.colors.brand.orange,
+  },
   pointType: { flexDirection: "row", alignItems: "center", gap: theme.spacing.sm },
+  dragHandle: {
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.background.muted,
+  },
+  orderBadge: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: theme.colors.brand.navy,
+  },
+  orderBadgeText: {
+    fontSize: theme.font.xs,
+    fontWeight: "800",
+    color: theme.colors.text.inverse,
+  },
   pointTypeText: { fontSize: theme.font.sm, fontWeight: "700", color: theme.colors.text.primary },
   pointSegment: {
     fontSize: theme.font.xs,

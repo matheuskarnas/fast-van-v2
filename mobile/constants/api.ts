@@ -114,6 +114,7 @@ export const ApiEndpoints = {
   ADD_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points`,
   UPDATE_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points/:pointId`,
   UPDATE_LINE_POINT_PASSENGERS: `${API_URL}/api/v1/lines/:lineId/points/:pointId/passengers`,
+  REORDER_LINE_POINTS: `${API_URL}/api/v1/lines/:lineId/points/order`,
   DELETE_LINE_POINT: `${API_URL}/api/v1/lines/:lineId/points/:pointId`,
 };
 

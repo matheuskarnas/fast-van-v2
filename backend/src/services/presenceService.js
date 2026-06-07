@@ -642,20 +642,49 @@ async function buildDailyRoute(lineId, date) {
   if (shouldUseDatabase()) {
     // Retorna pontos que têm ao menos 1 passageiro confirmado no trecho
     const res = await query(
-      `SELECT lp.id, lp.address, lp.type, lp.segment
+      `SELECT lp.id,
+              lp.address,
+              lp.type,
+              lp.segment,
+              lp.latitude,
+              lp.longitude,
+              lp.place_id,
+              lp.sort_order,
+              ARRAY_AGG(passenger_link.passenger_id) AS confirmed_passenger_ids
        FROM line_points lp
+       CROSS JOIN LATERAL jsonb_array_elements_text(lp.passengers) AS passenger_link(passenger_id)
+       JOIN line_enrollments e
+         ON e.line_id = lp.line_id
+        AND e.passenger_id = passenger_link.passenger_id
+       LEFT JOIN presence_records pr
+         ON pr.line_id = e.line_id
+        AND pr.passenger_id = e.passenger_id
+        AND pr.date = $2
        WHERE lp.line_id = $1
-         AND EXISTS (
-           SELECT 1 FROM line_enrollments e
-           LEFT JOIN presence_records pr
-             ON pr.line_id = e.line_id AND pr.passenger_id = e.passenger_id AND pr.date = $2
-           WHERE e.line_id = $1
-             AND COALESCE(pr.status, $3) NOT IN ('não vai e nem volta',
-               CASE WHEN lp.segment = 'ida' THEN 'não vou mas volto' ELSE 'só vou e não volto' END)
-         )`,
+         AND COALESCE(pr.slot_status, 'confirmed') IN ('confirmed', 'switched')
+         AND (
+           (lp.segment = 'ida' AND COALESCE(pr.status, $3) IN ('vai e volta', 'só vou e não volto'))
+           OR
+           (lp.segment = 'volta' AND COALESCE(pr.status, $3) IN ('vai e volta', 'não vou mas volto'))
+         )
+       GROUP BY lp.id, lp.address, lp.type, lp.segment, lp.latitude, lp.longitude, lp.place_id, lp.sort_order, lp.created_at
+       ORDER BY lp.segment ASC, lp.sort_order ASC NULLS LAST, lp.created_at ASC`,
       [lineId, date, DEFAULT_STATUS],
     );
-    return { success: true, points: res.rows };
+    return {
+      success: true,
+      points: res.rows.map((row) => ({
+        id: row.id,
+        address: row.address,
+        type: row.type,
+        segment: row.segment,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        placeId: row.place_id,
+        sortOrder: row.sort_order,
+        confirmedPassengerIds: row.confirmed_passenger_ids || [],
+      })),
+    };
   }
 
   const line = getLine(lineId);

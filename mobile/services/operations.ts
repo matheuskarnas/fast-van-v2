@@ -22,6 +22,10 @@ export interface RoutePoint {
   address: string;
   type: string;
   segment: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  placeId?: string | null;
+  confirmedPassengerIds?: string[];
 }
 
 export interface SlotOccupancy {

@@ -40,6 +40,7 @@ function mapPointRowToDomain(row) {
     latitude: row.latitude ?? null,
     longitude: row.longitude ?? null,
     placeId: row.place_id ?? null,
+    sortOrder: row.sort_order ?? null,
     createdAt: row.created_at,
   };
 }
@@ -198,7 +199,7 @@ async function updatePointPassengers(lineId, pointId, passengerIds, driverId) {
         `UPDATE line_points
             SET passengers = $1::jsonb
           WHERE id = $2 AND line_id = $3
-          RETURNING id, address, type, segment, passengers, latitude, longitude, place_id, created_at`,
+          RETURNING id, address, type, segment, passengers, latitude, longitude, place_id, sort_order, created_at`,
         [JSON.stringify(normalizedPassengerIds), pointId, lineId],
       );
       await removePassengersFromOtherSegmentPoints(lineId, pointId, pointRes.rows[0].segment, normalizedPassengerIds);
@@ -232,8 +233,10 @@ async function updatePointPassengers(lineId, pointId, passengerIds, driverId) {
 async function getPointsByLineId(lineId) {
   if (!shouldUseDatabase()) return [];
   const result = await query(
-    `SELECT id, line_id, address, type, segment, passengers, latitude, longitude, place_id, created_at
-     FROM line_points WHERE line_id = $1 ORDER BY created_at ASC`,
+    `SELECT id, line_id, address, type, segment, passengers, latitude, longitude, place_id, sort_order, created_at
+     FROM line_points
+     WHERE line_id = $1
+     ORDER BY segment ASC, sort_order ASC NULLS LAST, created_at ASC`,
     [lineId],
   );
   return enrichPointsWithPassengers(lineId, result.rows.map(mapPointRowToDomain));
@@ -363,22 +366,31 @@ async function addPickupDropoffPoint(lineId, pointData, driverId) {
 
     if (shouldUseDatabase()) {
       const id = `point_${Date.now()}`;
+      const segment = pointData.segment || "ida";
+      const orderRes = await query(
+        `SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order
+           FROM line_points
+          WHERE line_id = $1 AND segment = $2`,
+        [lineId, segment],
+      );
+      const nextOrder = orderRes.rows[0]?.next_order ?? 0;
       const res = await query(
-        `INSERT INTO line_points (id, line_id, address, type, segment, passengers, latitude, longitude, place_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-         RETURNING id, address, type, segment, passengers, latitude, longitude, place_id, created_at`,
+        `INSERT INTO line_points (id, line_id, address, type, segment, passengers, latitude, longitude, place_id, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING id, address, type, segment, passengers, latitude, longitude, place_id, sort_order, created_at`,
         [
           id, lineId,
           pointData.address,
           pointData.type || "pickup",
-          pointData.segment || "ida",
+          segment,
           JSON.stringify(passengers),
           pointData.latitude ?? null,
           pointData.longitude ?? null,
           pointData.placeId ?? null,
+          nextOrder,
         ],
       );
-      await removePassengersFromOtherSegmentPoints(lineId, id, pointData.segment || "ida", passengers);
+      await removePassengersFromOtherSegmentPoints(lineId, id, segment, passengers);
       return { success: true, point: mapPointRowToDomain(res.rows[0]) };
     }
 
@@ -388,6 +400,7 @@ async function addPickupDropoffPoint(lineId, pointData, driverId) {
       type: pointData.type || "pickup",
       segment: pointData.segment || "ida",
       passengers,
+      sortOrder: line.pickupDropoffPoints.filter((p) => p.segment === (pointData.segment || "ida")).length,
       createdAt: new Date().toISOString(),
     };
     line.pickupDropoffPoints.push(newPoint);
@@ -426,11 +439,25 @@ async function updatePickupDropoffPoint(lineId, pointId, updateData, driverId) {
       let idx = 1;
       if (updateData.address !== undefined) { fields.push(`address = $${idx++}`); values.push(updateData.address); }
       if (updateData.type !== undefined) { fields.push(`type = $${idx++}`); values.push(updateData.type); }
-      if (updateData.segment !== undefined) { fields.push(`segment = $${idx++}`); values.push(updateData.segment); }
+      if (updateData.segment !== undefined) {
+        fields.push(`segment = $${idx++}`);
+        values.push(updateData.segment);
+        const orderRes = await query(
+          `SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order
+             FROM line_points
+            WHERE line_id = $1 AND segment = $2 AND id <> $3`,
+          [lineId, updateData.segment, pointId],
+        );
+        fields.push(`sort_order = $${idx++}`);
+        values.push(orderRes.rows[0]?.next_order ?? 0);
+      }
       if (fields.length === 0) return { success: false, error: "Nenhum campo para atualizar" };
-      values.push(pointId);
+      values.push(pointId, lineId);
       const res = await query(
-        `UPDATE line_points SET ${fields.join(", ")} WHERE id = $${idx} RETURNING id, address, type, segment, passengers, created_at`,
+        `UPDATE line_points
+            SET ${fields.join(", ")}
+          WHERE id = $${idx} AND line_id = $${idx + 1}
+          RETURNING id, address, type, segment, passengers, latitude, longitude, place_id, sort_order, created_at`,
         values,
       );
       if (!res.rows[0]) return { success: false, error: "Ponto não encontrado" };
@@ -448,10 +475,80 @@ async function updatePickupDropoffPoint(lineId, pointId, updateData, driverId) {
       point.address = updateData.address;
     }
     if (updateData.type !== undefined) point.type = updateData.type;
-    if (updateData.segment !== undefined) point.segment = updateData.segment;
+    if (updateData.segment !== undefined) {
+      point.segment = updateData.segment;
+      point.sortOrder = line.pickupDropoffPoints.filter((p) => p.segment === updateData.segment && p.id !== pointId).length;
+    }
     return { success: true, point };
   } catch (error) {
     return { success: false, error: `Erro ao atualizar ponto: ${error.message}` };
+  }
+}
+
+async function reorderLinePoints(lineId, segment, pointIds, driverId) {
+  try {
+    if (!["ida", "volta"].includes(segment)) {
+      return { success: false, error: "Trecho inválido" };
+    }
+    if (!Array.isArray(pointIds) || pointIds.length === 0) {
+      return { success: false, error: "Envie a lista de pontos na nova ordem" };
+    }
+    const uniqueIds = [...new Set(pointIds.filter(Boolean))];
+    if (uniqueIds.length !== pointIds.length) {
+      return { success: false, error: "A lista de pontos não pode ter duplicados" };
+    }
+
+    if (shouldUseDatabase()) {
+      const lineRes = await query(`SELECT owner_driver_id, driver_id FROM lines WHERE id = $1`, [lineId]);
+      if (!lineRes.rows[0]) return { success: false, error: "Linha não encontrada" };
+      const { owner_driver_id, driver_id } = lineRes.rows[0];
+      if (owner_driver_id !== driverId && driver_id !== driverId) {
+        return { success: false, error: "Você não tem permissão para gerenciar esta linha" };
+      }
+
+      const existingRes = await query(
+        `SELECT id
+           FROM line_points
+          WHERE line_id = $1 AND segment = $2`,
+        [lineId, segment],
+      );
+      const existingIds = existingRes.rows.map((row) => row.id);
+      if (existingIds.length !== uniqueIds.length || existingIds.some((id) => !uniqueIds.includes(id))) {
+        return { success: false, error: "Envie todos os pontos deste trecho para salvar a ordem" };
+      }
+
+      await Promise.all(
+        uniqueIds.map((pointId, index) =>
+          query(
+            `UPDATE line_points
+                SET sort_order = $1
+              WHERE id = $2 AND line_id = $3 AND segment = $4`,
+            [index, pointId, lineId, segment],
+          ),
+        ),
+      );
+      return { success: true };
+    }
+
+    const line = process.env.USE_MOCK_DB === "true"
+      ? mockLines.find((l) => l.id === lineId)
+      : null;
+    if (!line) return { success: false, error: "Linha não encontrada" };
+    if (line.ownerDriverId !== driverId && line.driverId !== driverId) {
+      return { success: false, error: "Você não tem permissão para gerenciar esta linha" };
+    }
+    const segmentPoints = line.pickupDropoffPoints.filter((point) => point.segment === segment);
+    const existingIds = segmentPoints.map((point) => point.id);
+    if (existingIds.length !== uniqueIds.length || existingIds.some((id) => !uniqueIds.includes(id))) {
+      return { success: false, error: "Envie todos os pontos deste trecho para salvar a ordem" };
+    }
+    line.pickupDropoffPoints.forEach((point) => {
+      const nextOrder = uniqueIds.indexOf(point.id);
+      if (point.segment === segment && nextOrder >= 0) point.sortOrder = nextOrder;
+    });
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: `Erro ao reordenar pontos: ${error.message}` };
   }
 }
 
@@ -658,6 +755,7 @@ module.exports = {
   removePickupDropoffPoint,
   listLinePassengers,
   updatePointPassengers,
+  reorderLinePoints,
   getLineById,
   getLinesByDriver,
   hasActiveLineByVehicleId,

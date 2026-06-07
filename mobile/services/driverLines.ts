@@ -10,6 +10,7 @@ export interface LinePoint {
   latitude?: number | null;
   longitude?: number | null;
   placeId?: string | null;
+  sortOrder?: number | null;
 }
 
 export interface Line {
@@ -198,6 +199,20 @@ export async function updateLinePointPassengers(
       .replace(":lineId", lineId)
       .replace(":pointId", pointId);
     const response = await apiService.patch<PointResponse>(url, { passengerIds });
+    return response.data;
+  } catch (error: any) {
+    return { success: false, error: extractError(error) };
+  }
+}
+
+export async function reorderLinePoints(
+  lineId: string,
+  segment: "ida" | "volta",
+  pointIds: string[],
+): Promise<{ success: boolean; error?: ServiceError }> {
+  try {
+    const url = ApiEndpoints.REORDER_LINE_POINTS.replace(":lineId", lineId);
+    const response = await apiService.put<{ success: boolean }>(url, { segment, pointIds });
     return response.data;
   } catch (error: any) {
     return { success: false, error: extractError(error) };

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,111 +13,300 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import { theme } from "../../../../../constants/theme";
-import { getLineById, type LinePoint } from "../../../../../services/driverLines";
+import { getLineById } from "../../../../../services/driverLines";
+import { getOperationsDashboard, type RoutePoint } from "../../../../../services/operations";
 
-const SEGMENT_COLORS = {
+type Segment = "ida" | "volta";
+
+const SEGMENT_COLORS: Record<Segment, string> = {
   ida: theme.colors.brand.orange,
   volta: theme.colors.brand.navy,
 };
 
-const TYPE_ICONS = {
-  pickup: "↑",
-  dropoff: "↓",
-};
+interface Coordinate {
+  latitude: number;
+  longitude: number;
+}
+
+interface DestinationPoint extends Coordinate {
+  address: string;
+}
 
 interface RouteInfo {
   distanceM: number;
   durationS: number;
+  coordinates: Coordinate[];
 }
 
-async function fetchRouteInfo(waypoints: { latitude: number; longitude: number }[]): Promise<RouteInfo | null> {
-  if (waypoints.length < 2) return null;
+interface DirectionsResult {
+  route: RouteInfo | null;
+  error?: string;
+}
+
+const FATEC_SJC_COORDINATE: DestinationPoint = {
+  address: "FATEC São José dos Campos - Prof. Jessen Vidal",
+  latitude: -23.162919,
+  longitude: -45.795046,
+};
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function decodePolyline(encoded: string): Coordinate[] {
+  const coordinates: Coordinate[] = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+
+  while (index < encoded.length) {
+    let shift = 0;
+    let result = 0;
+    let byte = 0;
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+
+    shift = 0;
+    result = 0;
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+
+    coordinates.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
+  }
+
+  return coordinates;
+}
+
+function looksLikeFatecSjc(address: string) {
+  const normalized = address.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return normalized.includes("fatec") && (
+    normalized.includes("sjc") ||
+    normalized.includes("sao jose") ||
+    normalized.includes("jose dos campos")
+  );
+}
+
+async function resolveDestinationPlace(address: string, city?: string): Promise<DestinationPoint | null> {
   const key = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!address) return null;
+  if (looksLikeFatecSjc(address)) return FATEC_SJC_COORDINATE;
   if (!key) return null;
-  const origin = `${waypoints[0].latitude},${waypoints[0].longitude}`;
-  const destination = `${waypoints[waypoints.length - 1].latitude},${waypoints[waypoints.length - 1].longitude}`;
-  const mid = waypoints.slice(1, -1).map((p) => `${p.latitude},${p.longitude}`).join("|");
-  const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}${mid ? `&waypoints=${encodeURIComponent(mid)}` : ""}&key=${key}`;
+  const searches = [
+    `${address}, São José dos Campos, SP, Brasil`,
+    city ? `${address}, ${city}, SP, Brasil` : "",
+    `${address}, Brasil`,
+    address,
+  ].filter(Boolean);
+
   try {
-    const res = await fetch(url);
-    const json = await res.json();
-    if (json.status !== "OK" || !json.routes[0]) return null;
-    const legs = json.routes[0].legs as any[];
-    const distanceM = legs.reduce((s: number, l: any) => s + l.distance.value, 0);
-    const durationS = legs.reduce((s: number, l: any) => s + l.duration.value, 0);
-    return { distanceM, durationS };
-  } catch { return null; }
+    for (const search of searches) {
+      const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": key,
+          "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.location",
+        },
+        body: JSON.stringify({
+          textQuery: search,
+          languageCode: "pt-BR",
+          regionCode: "BR",
+          maxResultCount: 1,
+        }),
+      });
+      const json = await response.json();
+      const place = json.places?.[0];
+      const location = place?.location;
+      if (location) {
+        return {
+          address: place.formattedAddress || place.displayName?.text || address,
+          latitude: location.latitude,
+          longitude: location.longitude,
+        };
+      }
+    }
+    return looksLikeFatecSjc(address) ? FATEC_SJC_COORDINATE : null;
+  } catch {
+    return looksLikeFatecSjc(address) ? FATEC_SJC_COORDINATE : null;
+  }
 }
 
-function formatDistance(m: number) {
-  return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`;
+async function fetchDirections(waypoints: Coordinate[]): Promise<DirectionsResult> {
+  if (waypoints.length < 2) return { route: null };
+  const key = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!key) return { route: null, error: "Chave do Google Maps não configurada." };
+
+  const [origin, ...rest] = waypoints;
+  const destination = rest[rest.length - 1];
+  const intermediates = rest.slice(0, -1);
+
+  try {
+    const response = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": key,
+        "X-Goog-FieldMask": "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline",
+      },
+      body: JSON.stringify({
+        origin: { location: { latLng: toRoutesLatLng(origin) } },
+        destination: { location: { latLng: toRoutesLatLng(destination) } },
+        intermediates: intermediates.map((point) => ({ location: { latLng: toRoutesLatLng(point) } })),
+        travelMode: "DRIVE",
+        routingPreference: "TRAFFIC_UNAWARE",
+        computeAlternativeRoutes: false,
+        languageCode: "pt-BR",
+        units: "METRIC",
+      }),
+    });
+    const json = await response.json();
+    const route = json.routes?.[0];
+    if (!response.ok || !route) {
+      const message = json.error?.message || "Não foi possível calcular o trajeto pela Routes API.";
+      console.warn("Routes API falhou", response.status, message);
+      return { route: null, error: message };
+    }
+    const encodedPolyline = route.polyline?.encodedPolyline;
+    if (!encodedPolyline) {
+      return { route: null, error: "A API não retornou o desenho do trajeto." };
+    }
+    return {
+      route: {
+        distanceM: route.distanceMeters ?? 0,
+        durationS: Number.parseInt(String(route.duration ?? "0s").replace("s", ""), 10) || 0,
+        coordinates: decodePolyline(encodedPolyline),
+      },
+    };
+  } catch {
+    return { route: null, error: "Falha de rede ao calcular o trajeto." };
+  }
 }
 
-function formatDuration(s: number) {
-  const h = Math.floor(s / 3600);
-  const min = Math.round((s % 3600) / 60);
-  if (h > 0) return `${h}h ${min}min`;
-  return `${min} min`;
+function formatDistance(meters: number) {
+  return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${meters} m`;
+}
+
+function formatDuration(seconds: number) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.round((seconds % 3600) / 60);
+  if (hours > 0) return `${hours}h ${minutes}min`;
+  return `${minutes} min`;
+}
+
+function hasCoordinates(point: RoutePoint): point is RoutePoint & Coordinate {
+  return point.latitude != null && point.longitude != null;
+}
+
+function compareRoutePoints(a: RoutePoint, b: RoutePoint) {
+  const orderA = a.sortOrder ?? Number.MAX_SAFE_INTEGER;
+  const orderB = b.sortOrder ?? Number.MAX_SAFE_INTEGER;
+  if (orderA !== orderB) return orderA - orderB;
+  return a.id.localeCompare(b.id);
+}
+
+function toRoutesLatLng(point: Coordinate) {
+  return {
+    latitude: point.latitude,
+    longitude: point.longitude,
+  };
 }
 
 export default function LineMapScreen() {
   const { lineId } = useLocalSearchParams<{ lineId: string }>();
   const router = useRouter();
   const mapRef = useRef<MapView>(null);
-  const [points, setPoints] = useState<LinePoint[]>([]);
+  const [activeSegment, setActiveSegment] = useState<Segment>("ida");
+  const [lineDestination, setLineDestination] = useState("");
+  const [destination, setDestination] = useState<DestinationPoint | null>(null);
+  const [routePoints, setRoutePoints] = useState<RoutePoint[]>([]);
+  const [selectedPoint, setSelectedPoint] = useState<RoutePoint | null>(null);
+  const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
+  const [routeError, setRouteError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [selectedPoint, setSelectedPoint] = useState<LinePoint | null>(null);
-  const [idaRoute, setIdaRoute] = useState<RouteInfo | null>(null);
-  const [voltaRoute, setVoltaRoute] = useState<RouteInfo | null>(null);
   const [calculatingRoute, setCalculatingRoute] = useState(false);
+  const date = todayISO();
 
   const load = useCallback(async () => {
     if (!lineId) return;
-    const res = await getLineById(lineId);
-    if (res.success && res.line) {
-      const geoPoints = (res.line.points ?? []).filter(
-        (p) => p.latitude != null && p.longitude != null,
-      );
-      setPoints(geoPoints);
+    setLoading(true);
+    const [lineResult, dashboardResult] = await Promise.all([
+      getLineById(lineId),
+      getOperationsDashboard(lineId, date),
+    ]);
 
-      // Ajusta câmera para mostrar todos os pontos
-      if (geoPoints.length > 0 && mapRef.current) {
-        setTimeout(() => {
-          mapRef.current?.fitToCoordinates(
-            geoPoints.map((p) => ({ latitude: p.latitude!, longitude: p.longitude! })),
-            { edgePadding: { top: 80, right: 40, bottom: 120, left: 40 }, animated: true },
-          );
-        }, 500);
-      }
-    } else {
+    if (!lineResult.success || !lineResult.line) {
       Alert.alert("Erro", "Linha não encontrada.");
       router.back();
+      return;
     }
+
+    setLineDestination(lineResult.line.destinationPlace);
+    setDestination(await resolveDestinationPlace(lineResult.line.destinationPlace, lineResult.line.originCity));
+
+    if (dashboardResult.success) {
+      setRoutePoints(dashboardResult.routePoints ?? []);
+    } else {
+      Alert.alert("Erro", dashboardResult.error?.message ?? "Não foi possível carregar a rota do dia.");
+    }
+
     setLoading(false);
-  }, [lineId]);
+  }, [date, lineId, router]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  // RF22: calcula rota após pontos carregados
-  useEffect(() => {
-    if (points.length < 2) return;
-    const calc = async () => {
-      setCalculatingRoute(true);
-      const idaPoints = points.filter((p) => p.segment === "ida").map((p) => ({ latitude: p.latitude!, longitude: p.longitude! }));
-      const voltaPoints = points.filter((p) => p.segment === "volta").map((p) => ({ latitude: p.latitude!, longitude: p.longitude! }));
-      const [ida, volta] = await Promise.all([
-        fetchRouteInfo(idaPoints),
-        fetchRouteInfo(voltaPoints),
-      ]);
-      setIdaRoute(ida);
-      setVoltaRoute(volta);
-      setCalculatingRoute(false);
-    };
-    calc();
-  }, [points]);
+  const visiblePoints = useMemo(
+    () => routePoints
+      .filter((point) => point.segment === activeSegment && hasCoordinates(point))
+      .sort(compareRoutePoints),
+    [activeSegment, routePoints],
+  );
 
-  const idaPoints = points.filter((p) => p.segment === "ida");
-  const voltaPoints = points.filter((p) => p.segment === "volta");
+  const routeWaypoints = useMemo(() => {
+    const pointCoordinates: Coordinate[] = visiblePoints.map((point) => ({
+      latitude: point.latitude!,
+      longitude: point.longitude!,
+    }));
+    if (!destination) return pointCoordinates;
+    if (activeSegment === "ida") return [...pointCoordinates, destination];
+    return [destination, ...pointCoordinates];
+  }, [activeSegment, destination, visiblePoints]);
+
+  useEffect(() => {
+    let active = true;
+    async function calculate() {
+      setRouteInfo(null);
+      setRouteError("");
+      if (routeWaypoints.length < 2) return;
+      setCalculatingRoute(true);
+      const result = await fetchDirections(routeWaypoints);
+      if (active) {
+        setRouteInfo(result.route);
+        setRouteError(result.error ?? "");
+        setCalculatingRoute(false);
+      }
+    }
+    calculate();
+    return () => { active = false; };
+  }, [routeWaypoints]);
+
+  useEffect(() => {
+    const coordinates = routeInfo?.coordinates.length ? routeInfo.coordinates : routeWaypoints;
+    if (coordinates.length === 0 || !mapRef.current) return;
+    setTimeout(() => {
+      mapRef.current?.fitToCoordinates(coordinates, {
+        edgePadding: { top: 110, right: 40, bottom: 170, left: 40 },
+        animated: true,
+      });
+    }, 300);
+  }, [routeInfo, routeWaypoints]);
 
   if (loading) {
     return (
@@ -129,28 +318,8 @@ export default function LineMapScreen() {
     );
   }
 
-  if (points.length === 0) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color={theme.colors.text.primary} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Mapa da rota</Text>
-        </View>
-        <View style={styles.center}>
-          <Ionicons name="map-outline" size={64} color={theme.colors.text.muted} style={{ opacity: 0.4, marginBottom: 16 }} />
-          <Text style={styles.emptyTitle}>Nenhum ponto com localização</Text>
-          <Text style={styles.emptyText}>Adicione pontos com endereço via Google Places para visualizá-los no mapa.</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const center = {
-    latitude: points.reduce((s, p) => s + p.latitude!, 0) / points.length,
-    longitude: points.reduce((s, p) => s + p.longitude!, 0) / points.length,
-  };
+  const center = routeWaypoints[0] || destination || { latitude: -23.1791, longitude: -45.8872 };
+  const activeColor = SEGMENT_COLORS[activeSegment];
 
   return (
     <View style={styles.container}>
@@ -158,44 +327,36 @@ export default function LineMapScreen() {
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={styles.map}
-        initialRegion={{ ...center, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
+        initialRegion={{ ...center, latitudeDelta: 0.08, longitudeDelta: 0.08 }}
         showsUserLocation
         showsMyLocationButton
       >
-        {/* Linha de ida */}
-        {idaPoints.length > 1 && (
-          <Polyline
-            coordinates={idaPoints.map((p) => ({ latitude: p.latitude!, longitude: p.longitude! }))}
-            strokeColor={SEGMENT_COLORS.ida}
-            strokeWidth={3}
-            lineDashPattern={[0]}
+        {routeInfo?.coordinates.length ? (
+          <Polyline coordinates={routeInfo.coordinates} strokeColor={activeColor} strokeWidth={5} />
+        ) : null}
+
+        {destination && (
+          <Marker
+            identifier="destination"
+            coordinate={destination}
+            title={activeSegment === "ida" ? "Destino da ida" : "Origem da volta"}
+            description={lineDestination}
+            pinColor={theme.colors.feedback.success}
           />
         )}
 
-        {/* Linha de volta */}
-        {voltaPoints.length > 1 && (
-          <Polyline
-            coordinates={voltaPoints.map((p) => ({ latitude: p.latitude!, longitude: p.longitude! }))}
-            strokeColor={SEGMENT_COLORS.volta}
-            strokeWidth={3}
-            lineDashPattern={[8, 4]}
-          />
-        )}
-
-        {/* Marcadores */}
-        {points.map((point, index) => (
+        {visiblePoints.map((point) => (
           <Marker
             key={point.id}
             coordinate={{ latitude: point.latitude!, longitude: point.longitude! }}
             title={point.address}
-            description={`${point.segment === "ida" ? "Ida" : "Volta"} · ${point.type === "pickup" ? "Embarque" : "Desembarque"}`}
+            description={`${activeSegment === "ida" ? "Ida" : "Volta"} · ${point.confirmedPassengerIds?.length ?? 0} passageiro(s) confirmado(s)`}
             onPress={() => setSelectedPoint(point)}
-            pinColor={SEGMENT_COLORS[point.segment ?? "ida"]}
+            pinColor={activeColor}
           />
         ))}
       </MapView>
 
-      {/* Header sobreposto */}
       <SafeAreaView style={styles.overlay} pointerEvents="box-none">
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={styles.backBtnOverlay}>
@@ -203,76 +364,74 @@ export default function LineMapScreen() {
           </Pressable>
           <View style={styles.headerInfo}>
             <Text style={styles.headerTitle}>Mapa da rota</Text>
-            <Text style={styles.headerSub}>{points.length} pontos cadastrados</Text>
+            <Text style={styles.headerSub}>{date}</Text>
           </View>
+        </View>
+
+        <View style={styles.segmentToggle}>
+          {(["ida", "volta"] as const).map((segment) => {
+            const selected = activeSegment === segment;
+            return (
+              <Pressable
+                key={segment}
+                style={[styles.segmentButton, selected && { backgroundColor: SEGMENT_COLORS[segment], borderColor: SEGMENT_COLORS[segment] }]}
+                onPress={() => { setActiveSegment(segment); setSelectedPoint(null); }}
+              >
+                <Ionicons
+                  name={segment === "ida" ? "arrow-forward-circle" : "return-down-back"}
+                  size={16}
+                  color={selected ? theme.colors.text.inverse : SEGMENT_COLORS[segment]}
+                />
+                <Text style={[styles.segmentButtonText, selected && { color: theme.colors.text.inverse }]}>
+                  {segment === "ida" ? "Ida" : "Volta"}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       </SafeAreaView>
 
-      {/* Legenda */}
-      <View style={styles.legend}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendLine, { backgroundColor: SEGMENT_COLORS.ida }]} />
-          <Text style={styles.legendText}>Ida ({idaPoints.length})</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendLine, { backgroundColor: SEGMENT_COLORS.volta, borderStyle: "dashed" }]} />
-          <Text style={styles.legendText}>Volta ({voltaPoints.length})</Text>
-        </View>
+      <View style={styles.routeInfoCard}>
+        {calculatingRoute ? (
+          <View style={styles.routeInfoRow}>
+            <ActivityIndicator size="small" color={activeColor} />
+            <Text style={styles.routeInfoLabel}>Calculando trajeto...</Text>
+          </View>
+        ) : routeInfo ? (
+          <>
+            <View style={styles.routeInfoRow}>
+              <View style={[styles.routeInfoDot, { backgroundColor: activeColor }]} />
+              <Text style={styles.routeInfoLabel}>{activeSegment === "ida" ? "Ida" : "Volta"}</Text>
+              <Text style={styles.routeInfoValue}>{formatDistance(routeInfo.distanceM)}</Text>
+              <Text style={styles.routeInfoSep}>·</Text>
+              <Text style={styles.routeInfoValue}>{formatDuration(routeInfo.durationS)}</Text>
+            </View>
+            <Text style={styles.routeInfoHint}>
+              {visiblePoints.length} ponto(s) ativo(s) com passageiros confirmados · {activeSegment === "ida" ? "termina no destino" : "começa no destino"}
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.routeInfoHint}>
+              {visiblePoints.length === 0
+                ? "Nenhum ponto ativo para este trecho hoje."
+                : routeError || "Selecione pelo menos um ponto com localização e o destino da linha."}
+            </Text>
+            {!!routeError && (
+              <Text style={styles.routeErrorHint}>
+                A linha reta foi removida; só vou desenhar quando a Routes API retornar o trajeto real.
+              </Text>
+            )}
+          </>
+        )}
       </View>
 
-      {/* RF22: Painel de distância e tempo */}
-      {(idaRoute || voltaRoute || calculatingRoute) && !selectedPoint && (
-        <View style={styles.routeInfoCard}>
-          {calculatingRoute ? (
-            <View style={styles.routeInfoRow}>
-              <ActivityIndicator size="small" color={theme.colors.brand.orange} />
-              <Text style={styles.routeInfoLabel}>Calculando rota...</Text>
-            </View>
-          ) : (
-            <>
-              {idaRoute && (
-                <View style={styles.routeInfoRow}>
-                  <View style={[styles.routeInfoDot, { backgroundColor: SEGMENT_COLORS.ida }]} />
-                  <Text style={styles.routeInfoLabel}>Ida</Text>
-                  <Text style={styles.routeInfoValue}>{formatDistance(idaRoute.distanceM)}</Text>
-                  <Text style={styles.routeInfoSep}>·</Text>
-                  <Text style={styles.routeInfoValue}>{formatDuration(idaRoute.durationS)}</Text>
-                </View>
-              )}
-              {voltaRoute && (
-                <View style={styles.routeInfoRow}>
-                  <View style={[styles.routeInfoDot, { backgroundColor: SEGMENT_COLORS.volta }]} />
-                  <Text style={styles.routeInfoLabel}>Volta</Text>
-                  <Text style={styles.routeInfoValue}>{formatDistance(voltaRoute.distanceM)}</Text>
-                  <Text style={styles.routeInfoSep}>·</Text>
-                  <Text style={styles.routeInfoValue}>{formatDuration(voltaRoute.durationS)}</Text>
-                </View>
-              )}
-              {idaRoute && voltaRoute && (
-                <View style={[styles.routeInfoRow, styles.routeInfoTotal]}>
-                  <Ionicons name="swap-vertical-outline" size={14} color={theme.colors.text.secondary} />
-                  <Text style={styles.routeInfoLabel}>Total</Text>
-                  <Text style={[styles.routeInfoValue, { fontWeight: "800" }]}>
-                    {formatDistance(idaRoute.distanceM + voltaRoute.distanceM)}
-                  </Text>
-                  <Text style={styles.routeInfoSep}>·</Text>
-                  <Text style={[styles.routeInfoValue, { fontWeight: "800" }]}>
-                    {formatDuration(idaRoute.durationS + voltaRoute.durationS)}
-                  </Text>
-                </View>
-              )}
-            </>
-          )}
-        </View>
-      )}
-
-      {/* Card do ponto selecionado */}
       {selectedPoint && (
         <View style={styles.pointCard}>
           <View style={styles.pointCardHeader}>
-            <View style={[styles.pointTypeBadge, { backgroundColor: SEGMENT_COLORS[selectedPoint.segment ?? "ida"] + "20" }]}>
-              <Text style={[styles.pointTypeText, { color: SEGMENT_COLORS[selectedPoint.segment ?? "ida"] }]}>
-                {selectedPoint.segment === "ida" ? "Ida" : "Volta"} · {selectedPoint.type === "pickup" ? "Embarque" : "Desembarque"}
+            <View style={[styles.pointTypeBadge, { backgroundColor: activeColor + "20" }]}>
+              <Text style={[styles.pointTypeText, { color: activeColor }]}>
+                {activeSegment === "ida" ? "Ida" : "Volta"} · {selectedPoint.confirmedPassengerIds?.length ?? 0} confirmado(s)
               </Text>
             </View>
             <Pressable onPress={() => setSelectedPoint(null)}>
@@ -290,52 +449,54 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center", padding: theme.spacing.xl },
-  overlay: { position: "absolute", top: 0, left: 0, right: 0 },
+  overlay: { position: "absolute", top: 0, left: 0, right: 0, gap: theme.spacing.sm },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
     gap: theme.spacing.md,
-    backgroundColor: theme.colors.background.card,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border.soft,
   },
-  backBtn: { padding: theme.spacing.xs },
-  backBtnOverlay: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.95)", alignItems: "center", justifyContent: "center", ...theme.shadow.card },
-  headerInfo: { flex: 1 },
-  headerTitle: { fontSize: theme.font.lg, fontWeight: "800", color: theme.colors.text.primary },
-  headerSub: { fontSize: theme.font.xs, color: theme.colors.text.secondary },
-  emptyTitle: { fontSize: theme.font.lg, fontWeight: "700", color: theme.colors.text.primary, marginBottom: theme.spacing.sm, textAlign: "center" },
-  emptyText: { fontSize: theme.font.sm, color: theme.colors.text.secondary, textAlign: "center", lineHeight: 20 },
-  legend: {
-    position: "absolute",
-    bottom: 140,
-    right: theme.spacing.md,
+  backBtnOverlay: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
+    ...theme.shadow.card,
+  },
+  headerInfo: {
+    flex: 1,
     backgroundColor: "rgba(255,255,255,0.95)",
     borderRadius: theme.radius.md,
-    padding: theme.spacing.md,
-    gap: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
     ...theme.shadow.card,
   },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: theme.spacing.sm },
-  legendLine: { width: 24, height: 3, borderRadius: 2 },
-  legendText: { fontSize: theme.font.xs, fontWeight: "600", color: theme.colors.text.primary },
-  pointCard: {
-    position: "absolute",
-    bottom: theme.spacing.xl,
-    left: theme.spacing.md,
-    right: theme.spacing.md,
+  headerTitle: { fontSize: theme.font.md, fontWeight: "800", color: theme.colors.text.primary },
+  headerSub: { fontSize: theme.font.xs, color: theme.colors.text.secondary },
+  segmentToggle: {
+    flexDirection: "row",
+    alignSelf: "center",
     backgroundColor: "rgba(255,255,255,0.97)",
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    gap: theme.spacing.sm,
+    borderRadius: theme.radius.pill,
+    padding: 4,
+    gap: 4,
     ...theme.shadow.card,
   },
-  pointCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  pointTypeBadge: { paddingHorizontal: theme.spacing.sm, paddingVertical: 3, borderRadius: theme.radius.pill },
-  pointTypeText: { fontSize: theme.font.xs, fontWeight: "700" },
-  pointAddress: { fontSize: theme.font.md, fontWeight: "600", color: theme.colors.text.primary },
+  segmentButton: {
+    minWidth: 96,
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.spacing.xs,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.border.soft,
+  },
+  segmentButtonText: { fontSize: theme.font.sm, fontWeight: "800", color: theme.colors.text.primary },
   routeInfoCard: {
     position: "absolute",
     bottom: theme.spacing.xl,
@@ -348,9 +509,25 @@ const styles = StyleSheet.create({
     ...theme.shadow.card,
   },
   routeInfoRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing.sm },
-  routeInfoTotal: { borderTopWidth: 1, borderTopColor: theme.colors.border.soft, paddingTop: theme.spacing.xs, marginTop: theme.spacing.xs },
   routeInfoDot: { width: 10, height: 10, borderRadius: 5 },
-  routeInfoLabel: { fontSize: theme.font.sm, color: theme.colors.text.secondary, width: 36 },
-  routeInfoValue: { fontSize: theme.font.sm, color: theme.colors.text.primary, fontWeight: "600" },
+  routeInfoLabel: { fontSize: theme.font.sm, color: theme.colors.text.secondary, fontWeight: "700" },
+  routeInfoValue: { fontSize: theme.font.sm, color: theme.colors.text.primary, fontWeight: "800" },
   routeInfoSep: { fontSize: theme.font.sm, color: theme.colors.text.muted },
+  routeInfoHint: { fontSize: theme.font.xs, color: theme.colors.text.secondary, lineHeight: 18 },
+  routeErrorHint: { fontSize: theme.font.xs, color: theme.colors.feedback.error, lineHeight: 18 },
+  pointCard: {
+    position: "absolute",
+    bottom: 110,
+    left: theme.spacing.md,
+    right: theme.spacing.md,
+    backgroundColor: "rgba(255,255,255,0.97)",
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    gap: theme.spacing.sm,
+    ...theme.shadow.card,
+  },
+  pointCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  pointTypeBadge: { paddingHorizontal: theme.spacing.sm, paddingVertical: 3, borderRadius: theme.radius.pill },
+  pointTypeText: { fontSize: theme.font.xs, fontWeight: "800" },
+  pointAddress: { fontSize: theme.font.md, fontWeight: "600", color: theme.colors.text.primary },
 });

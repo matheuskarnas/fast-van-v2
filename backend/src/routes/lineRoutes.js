@@ -13,6 +13,7 @@ const {
   removePickupDropoffPoint,
   listLinePassengers,
   updatePointPassengers,
+  reorderLinePoints,
 } = require("../services/lineService");
 
 const router = express.Router();
@@ -175,6 +176,29 @@ router.patch("/:id/points/:pointId/passengers", requireAuth, async (req, res, ne
       });
     }
     return res.status(200).json({ success: true, point: result.point });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.put("/:id/points/order", requireAuth, async (req, res, next) => {
+  try {
+    if (req.auth.role !== "DRIVER") {
+      return res.status(403).json({
+        success: false,
+        error: { code: "FORBIDDEN_RESOURCE", message: "Somente motoristas podem reordenar pontos" },
+      });
+    }
+    const { segment, pointIds } = req.body || {};
+    const result = await reorderLinePoints(req.params.id, segment, pointIds, req.auth.id);
+    if (result.error) {
+      const status = result.error.includes("permiss") ? 403 : result.error.includes("não encontrad") ? 404 : 400;
+      return res.status(status).json({
+        success: false,
+        error: { code: "POINTS_REORDER_FAILED", message: result.error },
+      });
+    }
+    return res.status(200).json({ success: true });
   } catch (error) {
     return next(error);
   }
