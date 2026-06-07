@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   SafeAreaView,
@@ -12,54 +13,139 @@ import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "../../../../constants/theme";
-import { apiService } from "../../../../services/api";
-import { ApiEndpoints } from "../../../../constants/api";
 import { getSession } from "../../../../services/session";
-import { createPrivateConversation } from "../../../../services/chat";
-import type { PresenceLineSummary } from "../../../../services/presence";
+import {
+  createPrivateConversation,
+  getChatInbox,
+  type ChatInboxItem,
+} from "../../../../services/chat";
+import { UnreadBadge } from "../../../../components/chat/UnreadBadge";
+import { useUnreadChatCount } from "../../../../hooks/useUnreadChatCount";
 
 export default function PassengerChatListScreen() {
   const router = useRouter();
-  const [lines, setLines] = useState<PresenceLineSummary[]>([]);
+  const { refresh: refreshBadge } = useUnreadChatCount();
+  const [items, setItems] = useState<ChatInboxItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [passengerId, setPassengerId] = useState<string>("");
-  const [openingChat, setOpeningChat] = useState<string | null>(null);
+  const [passengerId, setPassengerId] = useState("");
+  const [openingId, setOpeningId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const today = new Date().toISOString().slice(0, 10);
-    const [session, linesRes] = await Promise.all([
-      getSession(),
-      apiService.get<{ success: boolean; lines: PresenceLineSummary[] }>(
-        `${ApiEndpoints.GET_MY_PRESENCE_LINES}?date=${today}`,
-      ).catch(() => ({ data: { success: false, lines: [] } })),
-    ]);
-    if (session?.userId) setPassengerId(session.userId);
-    if ((linesRes as any).data?.success) setLines((linesRes as any).data.lines ?? []);
-    setLoading(false);
+    try {
+      const session = await getSession();
+      if (session?.userId) setPassengerId(session.userId);
+
+      const result = await getChatInbox();
+      if (result.success) {
+        setItems(result.items ?? []);
+      }
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(
+    useCallback(() => {
+      load();
+      refreshBadge();
+    }, [load, refreshBadge]),
+  );
 
-  const openGroupChat = (line: PresenceLineSummary) => {
-    router.push({ pathname: "/(app)/shared/chat-group", params: { lineId: line.lineId, lineName: line.name } } as any);
+  const openGroupChat = (item: ChatInboxItem) => {
+    if (!item.lineId) return;
+    router.push({
+      pathname: "/(app)/shared/chat-group",
+      params: { lineId: item.lineId, lineName: item.title || item.lineName },
+    } as any);
   };
 
-  const openPrivateChat = async (line: PresenceLineSummary) => {
-    if (!passengerId) return;
-    setOpeningChat(line.lineId);
-    try {
-      // Pega o driverId da linha
-      const lineRes = await apiService.get<any>(`${ApiEndpoints.GET_LINE.replace(":id", line.lineId)}`).catch(() => null);
-      const driverId = lineRes?.data?.line?.ownerDriverId;
-      if (!driverId) return;
+  const openPrivateChat = async (item: ChatInboxItem) => {
+    if (!passengerId || !item.otherUserId) return;
 
-      const result = await createPrivateConversation({ passengerId, driverId, context: "line" }) as any;
+    if (item.conversationId) {
+      router.push({
+        pathname: "/(app)/(passenger)/chat/[id]",
+        params: {
+          id: item.conversationId,
+          otherUserName: item.otherUserName || "Motorista",
+        },
+      } as any);
+      return;
+    }
+
+    setOpeningId(item.otherUserId);
+    try {
+      const result = (await createPrivateConversation({
+        passengerId,
+        driverId: item.otherUserId,
+        context: "line",
+      })) as any;
+
       if (result?.success && result.conversation?.id) {
-        router.push(`/(app)/(passenger)/chat/${result.conversation.id}` as any);
+        router.push({
+          pathname: "/(app)/(passenger)/chat/[id]",
+          params: {
+            id: result.conversation.id,
+            otherUserName: item.otherUserName || "Motorista",
+          },
+        } as any);
+      } else {
+        Alert.alert("Erro", "Não foi possível abrir o chat com o motorista.");
       }
-    } catch { /* silent */ }
-    setOpeningChat(null);
+    } catch {
+      Alert.alert("Erro", "Não foi possível abrir o chat com o motorista.");
+    } finally {
+      setOpeningId(null);
+    }
+  };
+
+  const handlePress = (item: ChatInboxItem) => {
+    if (item.type === "group") {
+      openGroupChat(item);
+      return;
+    }
+    openPrivateChat(item);
+  };
+
+  const renderItem = ({ item }: { item: ChatInboxItem }) => {
+    const isGroup = item.type === "group";
+    const title = isGroup ? item.title : item.otherUserName;
+    const subtitle = isGroup
+      ? "Chat da linha"
+      : item.lineName || item.subtitle || "Chat privado";
+    const opening = !isGroup && openingId === item.otherUserId;
+
+    return (
+      <Pressable
+        style={styles.card}
+        onPress={() => handlePress(item)}
+        disabled={opening}
+      >
+        <View style={[styles.iconWrap, isGroup ? styles.iconGroup : styles.iconPrivate]}>
+          <Ionicons
+            name={isGroup ? "people" : "person"}
+            size={20}
+            color={isGroup ? theme.colors.brand.orange : theme.colors.brand.navy}
+          />
+        </View>
+        <View style={styles.info}>
+          <Text style={styles.name} numberOfLines={1}>{title}</Text>
+          <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
+          {item.lastMessage ? (
+            <Text style={styles.preview} numberOfLines={1}>{item.lastMessage}</Text>
+          ) : item.isNew ? (
+            <Text style={styles.previewNew}>Toque para iniciar conversa</Text>
+          ) : null}
+        </View>
+        {opening ? (
+          <ActivityIndicator size="small" color={theme.colors.brand.orange} />
+        ) : (
+          <UnreadBadge count={item.unreadCount} size="md" />
+        )}
+        <Ionicons name="chevron-forward" size={18} color={theme.colors.text.muted} />
+      </Pressable>
+    );
   };
 
   if (loading) {
@@ -78,48 +164,30 @@ export default function PassengerChatListScreen() {
         <Text style={styles.title}>Chat</Text>
       </View>
 
-      {lines.length === 0 ? (
+      {items.length === 0 ? (
         <View style={styles.center}>
-          <Ionicons name="chatbubbles-outline" size={56} color={theme.colors.text.muted} style={{ opacity: 0.4, marginBottom: 16 }} />
-          <Text style={styles.emptyTitle}>Nenhuma linha ativa</Text>
-          <Text style={styles.emptyText}>Entre em uma linha para acessar o chat do grupo e falar com o motorista.</Text>
+          <Ionicons
+            name="chatbubbles-outline"
+            size={56}
+            color={theme.colors.text.muted}
+            style={{ opacity: 0.4, marginBottom: 16 }}
+          />
+          <Text style={styles.emptyTitle}>Nenhuma conversa</Text>
+          <Text style={styles.emptyText}>
+            Entre em uma linha para acessar o chat do grupo e falar com o motorista.
+          </Text>
         </View>
       ) : (
         <FlatList
-          data={lines}
-          keyExtractor={(item: PresenceLineSummary) => item.lineId}
+          data={items}
+          keyExtractor={(item, index) =>
+            item.type === "group"
+              ? `group-${item.lineId}`
+              : `private-${item.conversationId || item.otherUserId}-${index}`
+          }
           contentContainerStyle={styles.list}
-          ListHeaderComponent={<Text style={styles.sectionLabel}>Minhas linhas</Text>}
-          renderItem={({ item }: { item: PresenceLineSummary }) => (
-            <View style={styles.lineCard}>
-              <View style={styles.lineInfo}>
-                <Text style={styles.lineName} numberOfLines={1}>{item.name || item.lineId}</Text>
-                <Text style={styles.lineRoute} numberOfLines={1}>
-                  {item.originCity} → {item.destinationPlace}
-                </Text>
-              </View>
-              <View style={styles.actions}>
-                <Pressable
-                  style={styles.actionBtn}
-                  onPress={() => openGroupChat(item)}
-                >
-                  <Ionicons name="people" size={16} color={theme.colors.brand.navy} />
-                  <Text style={styles.actionBtnText}>Grupo</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.actionBtn, openingChat === item.lineId && styles.actionBtnDisabled]}
-                  onPress={() => openPrivateChat(item)}
-                  disabled={openingChat === item.lineId}
-                >
-                  {openingChat === item.lineId
-                    ? <ActivityIndicator size="small" color={theme.colors.brand.orange} />
-                    : <Ionicons name="person" size={16} color={theme.colors.brand.orange} />
-                  }
-                  <Text style={[styles.actionBtnText, { color: theme.colors.brand.orange }]}>Motorista</Text>
-                </Pressable>
-              </View>
-            </View>
-          )}
+          ListHeaderComponent={<Text style={styles.sectionLabel}>Conversas</Text>}
+          renderItem={renderItem}
         />
       )}
     </SafeAreaView>
@@ -129,13 +197,31 @@ export default function PassengerChatListScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background.screen },
   center: { flex: 1, justifyContent: "center", alignItems: "center", padding: theme.spacing.xl },
-  header: { paddingHorizontal: theme.spacing.xl, paddingVertical: theme.spacing.lg, borderBottomWidth: 1, borderBottomColor: theme.colors.border.soft },
+  header: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border.soft,
+  },
   title: { fontSize: theme.font.xl, fontWeight: "800", color: theme.colors.text.primary },
-  emptyTitle: { fontSize: theme.font.lg, fontWeight: "700", color: theme.colors.text.primary, marginBottom: theme.spacing.sm, textAlign: "center" },
+  emptyTitle: {
+    fontSize: theme.font.lg,
+    fontWeight: "700",
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.sm,
+    textAlign: "center",
+  },
   emptyText: { fontSize: theme.font.sm, color: theme.colors.text.secondary, textAlign: "center" },
   list: { padding: theme.spacing.lg, gap: theme.spacing.sm },
-  sectionLabel: { fontSize: theme.font.xs, fontWeight: "700", color: theme.colors.text.secondary, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: theme.spacing.sm },
-  lineCard: {
+  sectionLabel: {
+    fontSize: theme.font.xs,
+    fontWeight: "700",
+    color: theme.colors.text.secondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: theme.spacing.sm,
+  },
+  card: {
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing.md,
@@ -146,11 +232,18 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.soft,
     ...theme.shadow.card,
   },
-  lineInfo: { flex: 1, gap: 2 },
-  lineName: { fontSize: theme.font.md, fontWeight: "700", color: theme.colors.text.primary },
-  lineRoute: { fontSize: theme.font.sm, color: theme.colors.text.secondary },
-  actions: { flexDirection: "row", gap: theme.spacing.sm },
-  actionBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: theme.spacing.sm, paddingVertical: 6, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border.default },
-  actionBtnText: { fontSize: theme.font.xs, fontWeight: "700", color: theme.colors.brand.navy },
-  actionBtnDisabled: { opacity: 0.5 },
+  iconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconGroup: { backgroundColor: theme.colors.brand.orange + "15" },
+  iconPrivate: { backgroundColor: theme.colors.brand.navy + "15" },
+  info: { flex: 1, gap: 2 },
+  name: { fontSize: theme.font.md, fontWeight: "700", color: theme.colors.text.primary },
+  subtitle: { fontSize: theme.font.sm, color: theme.colors.text.secondary },
+  preview: { fontSize: theme.font.xs, color: theme.colors.text.muted, marginTop: 2 },
+  previewNew: { fontSize: theme.font.xs, color: theme.colors.brand.orange, marginTop: 2 },
 });

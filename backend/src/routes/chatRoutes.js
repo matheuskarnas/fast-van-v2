@@ -15,6 +15,8 @@ const {
   createPoll,
   votePoll,
   getPoll,
+  getInbox,
+  getUnreadCount,
 } = require("../services/chatService");
 
 const router = express.Router();
@@ -42,6 +44,45 @@ function mapServiceErrorToStatus(errorMessage) {
 function parseBoolean(value) {
   return String(value).toLowerCase() === "true";
 }
+
+router.get("/inbox", requireAuth, async (req, res, next) => {
+  try {
+    const result = await getInbox(req.auth.id, req.auth.role);
+    if (result.success) return res.status(200).json(result);
+    return res.status(mapServiceErrorToStatus(result.error)).json(result);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/unread-count", requireAuth, async (req, res, next) => {
+  try {
+    const result = await getUnreadCount(req.auth.id, req.auth.role);
+    if (result.success) return res.status(200).json(result);
+    return res.status(mapServiceErrorToStatus(result.error)).json(result);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/lines/:lineId/passengers", requireAuth, async (req, res, next) => {
+  try {
+    if (req.auth.role !== "DRIVER") {
+      return res.status(403).json({
+        success: false,
+        error: { message: "Somente motoristas podem listar passageiros" },
+      });
+    }
+    const { listLineEnrollments } = require("../services/presenceService");
+    const result = await listLineEnrollments(req.params.lineId, req.auth.id);
+    if (!result.success) {
+      return res.status(mapServiceErrorToStatus(result.error)).json(result);
+    }
+    return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+});
 
 router.post("/private/conversations", requireAuth, async (req, res, next) => {
   try {

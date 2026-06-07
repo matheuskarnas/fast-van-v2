@@ -43,6 +43,9 @@ export const ApiEndpoints = {
 
   // Chat
   CREATE_PRIVATE_CONVERSATION: `${API_URL}/api/v1/chat/private/conversations`,
+  GET_CHAT_INBOX: `${API_URL}/api/v1/chat/inbox`,
+  GET_CHAT_UNREAD_COUNT: `${API_URL}/api/v1/chat/unread-count`,
+  GET_LINE_PASSENGERS_CHAT: `${API_URL}/api/v1/chat/lines/:lineId/passengers`,
   GET_PRIVATE_MESSAGES: `${API_URL}/api/v1/chat/private/conversations/:id/messages`,
   SEND_PRIVATE_MESSAGE: `${API_URL}/api/v1/chat/private/conversations/:id/messages`,
   MARK_PRIVATE_MESSAGES_READ: `${API_URL}/api/v1/chat/private/conversations/:id/read`,

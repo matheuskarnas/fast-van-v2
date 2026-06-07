@@ -21,6 +21,8 @@ export interface PresenceLineSummary {
   alternateDepartureTime?: string | null;
   alternateArrivalTime?: string | null;
   slotStatus?: "confirmed" | "switched" | "waitlist";
+  ownerDriverId?: string;
+  driverName?: string;
 }
 
 export interface PresenceError {

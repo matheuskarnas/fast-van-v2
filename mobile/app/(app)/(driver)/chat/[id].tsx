@@ -20,8 +20,10 @@ import { ChatTopBar } from "../../../../components/chat/ChatTopBar";
 import { MessageBubble } from "../../../../components/chat/MessageBubble";
 
 export default function DriverChatDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const { id, otherUserName } = useLocalSearchParams();
   const conversationId = typeof id === "string" ? id : String(id?.[0] ?? "");
+  const routeOtherUserName =
+    typeof otherUserName === "string" ? otherUserName : String(otherUserName?.[0] ?? "");
   const [messages, setMessages] = useState<any[]>([]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -29,12 +31,19 @@ export default function DriverChatDetailScreen() {
   const [userId, setUserId] = useState("");
 
   const conversationLabel = useMemo(
-    () => `Conversa ${conversationId || "privada"}`,
-    [conversationId],
+    () => {
+      if (routeOtherUserName) return routeOtherUserName;
+      const otherMessage = messages.find((message) => message.senderId !== userId);
+      return otherMessage?.senderName || "Chat privado";
+    },
+    [messages, routeOtherUserName, userId],
   );
 
-  const loadMessages = useCallback(async () => {
-    setLoading(true);
+  const loadMessages = useCallback(async (showInitialLoading = false) => {
+    if (showInitialLoading) {
+      setLoading(true);
+    }
+
     try {
       const result = await getPrivateMessages(conversationId);
       if (result.success) {
@@ -57,10 +66,10 @@ export default function DriverChatDetailScreen() {
     };
 
     bootstrap();
-    loadMessages();
+    loadMessages(true);
 
     const interval = setInterval(() => {
-      loadMessages();
+      loadMessages(false);
     }, 5000);
 
     return () => clearInterval(interval);
@@ -76,7 +85,7 @@ export default function DriverChatDetailScreen() {
       const result = await sendPrivateMessage(conversationId, text.trim());
       if (result.success) {
         setText("");
-        await loadMessages();
+        await loadMessages(false);
       }
     } finally {
       setSending(false);
@@ -90,7 +99,7 @@ export default function DriverChatDetailScreen() {
     >
       <ChatTopBar
         title={conversationLabel}
-        subtitle="Chat privado com o motorista"
+        subtitle="Chat privado com o passageiro"
         statusLabel="AGUARDANDO RESPOSTA"
       />
 
@@ -106,7 +115,11 @@ export default function DriverChatDetailScreen() {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <MessageBubble
-              sender={item.senderId === userId ? "Você" : item.senderId}
+              sender={
+                item.senderId === userId
+                  ? "Você"
+                  : item.senderName || item.senderId
+              }
               text={item.text}
               time={
                 item.timestamp

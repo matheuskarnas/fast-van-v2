@@ -108,3 +108,51 @@ export async function removeGroupMember(lineId: string, userId: string) {
   );
   return response.data;
 }
+
+export interface ChatInboxItem {
+  type: "group" | "private";
+  lineId?: string;
+  lineName?: string;
+  title?: string;
+  subtitle?: string;
+  conversationId?: string | null;
+  otherUserId?: string;
+  otherUserName?: string;
+  unreadCount: number;
+  lastMessage?: string | null;
+  lastMessageAt?: string | null;
+  isNew?: boolean;
+}
+
+export interface LinePassengerChat {
+  id: string;
+  name: string;
+  departureTime?: string | null;
+  arrivalTime?: string | null;
+}
+
+export async function getChatInbox() {
+  const response = await apiService.get<{
+    success: boolean;
+    items?: ChatInboxItem[];
+    totalUnread?: number;
+  }>(ApiEndpoints.GET_CHAT_INBOX);
+  return response.data;
+}
+
+export async function getUnreadChatCount() {
+  const response = await apiService.get<{ success: boolean; count?: number }>(
+    ApiEndpoints.GET_CHAT_UNREAD_COUNT,
+  );
+  return response.data;
+}
+
+export async function listLinePassengersForChat(lineId: string) {
+  const response = await apiService.get<{
+    success: boolean;
+    lineName?: string;
+    passengers?: LinePassengerChat[];
+    error?: { message?: string };
+  }>(ApiEndpoints.GET_LINE_PASSENGERS_CHAT.replace(":lineId", lineId));
+  return response.data;
+}

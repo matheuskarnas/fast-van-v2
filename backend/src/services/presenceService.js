@@ -438,10 +438,13 @@ async function listPassengerLinesByDate(passengerId, date) {
       `SELECT e.line_id, e.departure_time, e.arrival_time,
               l.name, l.origin_city, l.destination_place,
               l.departure_times, l.arrival_times,
+              l.owner_driver_id,
+              du.name AS driver_name,
               COALESCE(p.status, $3) as status,
               p.alternate_departure_time, p.alternate_arrival_time, p.slot_status
        FROM line_enrollments e
        JOIN lines l ON l.id = e.line_id
+       LEFT JOIN users du ON du.id = l.owner_driver_id
        LEFT JOIN presence_records p ON p.line_id = e.line_id AND p.passenger_id = e.passenger_id AND p.date = $2
        WHERE e.passenger_id = $1`,
       [passengerId, date, DEFAULT_STATUS],
@@ -462,19 +465,98 @@ async function listPassengerLinesByDate(passengerId, date) {
         alternateDepartureTime: r.alternate_departure_time,
         alternateArrivalTime: r.alternate_arrival_time,
         slotStatus: r.slot_status || "confirmed",
+        ownerDriverId: r.owner_driver_id,
+        driverName: r.driver_name,
       })),
     };
   }
 
-  const lines = mockPresenceDb.lines
-    .filter((line) => isPassengerActiveInLine(line, passengerId))
-    .map((line) => ({
-      lineId: line.id,
-      nextDate: line.nextDate,
-      status: getStatusForDate(line.id, passengerId, date),
-    }));
+  const { getUserById } = require("./userService");
+  const lines = await Promise.all(
+    mockPresenceDb.lines
+      .filter((line) => isPassengerActiveInLine(line, passengerId))
+      .map(async (line) => {
+        const driver = line.ownerDriverId
+          ? await getUserById(line.ownerDriverId)
+          : null;
+        return {
+          lineId: line.id,
+          name: line.name || line.id,
+          nextDate: line.nextDate,
+          status: getStatusForDate(line.id, passengerId, date),
+          ownerDriverId: line.ownerDriverId,
+          driverName: driver?.name || line.ownerDriverId,
+        };
+      }),
+  );
 
   return { success: true, lines };
+}
+
+async function listLineEnrollments(lineId, requesterId) {
+  if (!lineId || !requesterId) {
+    return { success: false, error: "Dados inválidos" };
+  }
+
+  if (shouldUseDatabase()) {
+    const lineRes = await query(
+      `SELECT owner_driver_id, driver_id, name FROM lines WHERE id = $1`,
+      [lineId],
+    );
+    if (!lineRes.rows[0]) {
+      return { success: false, error: "Linha não encontrada" };
+    }
+    const { owner_driver_id, driver_id } = lineRes.rows[0];
+    if (owner_driver_id !== requesterId && driver_id !== requesterId) {
+      return { success: false, error: "Você não tem permissão para acessar esta linha" };
+    }
+
+    const res = await query(
+      `SELECT e.passenger_id, u.name, e.departure_time, e.arrival_time
+       FROM line_enrollments e
+       JOIN users u ON u.id = e.passenger_id
+       WHERE e.line_id = $1
+       ORDER BY u.name`,
+      [lineId],
+    );
+
+    return {
+      success: true,
+      lineName: lineRes.rows[0].name,
+      passengers: res.rows.map((r) => ({
+        id: r.passenger_id,
+        name: r.name,
+        departureTime: r.departure_time,
+        arrivalTime: r.arrival_time,
+      })),
+    };
+  }
+
+  const line = getLine(lineId);
+  if (!line) return { success: false, error: "Linha não encontrada" };
+  if (!canDriverAccessLine(line, requesterId)) {
+    return { success: false, error: "Você não tem permissão para acessar esta linha" };
+  }
+
+  const { getUserById } = require("./userService");
+  const passengers = await Promise.all(
+    line.passengerIds.map(async (passengerId) => {
+      const user = await getUserById(passengerId);
+      const slot = getEnrollmentSlot(lineId, passengerId);
+      return {
+        id: passengerId,
+        name: user?.name || passengerId,
+        departureTime: slot?.departureTime || null,
+        arrivalTime: slot?.arrivalTime || null,
+      };
+    }),
+  );
+
+  return {
+    success: true,
+    lineName: line.name || lineId,
+    passengers,
+  };
 }
 
 async function listDriverOperationalLines(driverId) {
@@ -739,6 +821,7 @@ module.exports = {
   markPassengerPresence,
   getPassengerPresenceStatus,
   listPassengerLinesByDate,
+  listLineEnrollments,
   listDriverOperationalLines,
   getConfirmedPassengersBySegment,
   buildDailyRoute,

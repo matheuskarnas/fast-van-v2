@@ -1,3 +1,5 @@
+process.env.USE_MOCK_DB = "true";
+
 const request = require("supertest");
 const jwt = require("jsonwebtoken");
 

@@ -1,8 +1,11 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "../../../constants/theme";
+import { useUnreadChatCount } from "../../../hooks/useUnreadChatCount";
 
 export default function PassengerLayout() {
+  const { badge } = useUnreadChatCount();
+
   return (
     <Tabs
       screenOptions={{
@@ -42,6 +45,13 @@ export default function PassengerLayout() {
         name="chat"
         options={{
           title: "Chat",
+          tabBarBadge: badge,
+          tabBarBadgeStyle: {
+            backgroundColor: theme.colors.feedback.error,
+            color: "#fff",
+            fontSize: 10,
+            fontWeight: "800",
+          },
           tabBarIcon: ({ color, size }) => (
             <Ionicons
               name="chatbubble-ellipses-outline"

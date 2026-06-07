@@ -149,8 +149,7 @@ export default function ChatGroupScreen() {
               <Pressable
                 key={opt.id}
                 style={[styles.pollOption, voted && styles.pollOptionVoted]}
-                onPress={() => !myVote && handleVote(poll.id, opt.id)}
-                disabled={!!myVote}
+                onPress={() => handleVote(poll.id, opt.id)}
               >
                 <View style={[styles.pollBar, { width: `${pct}%` as any }]} />
                 <Text style={[styles.pollOptionText, voted && styles.pollOptionTextVoted]}>{opt.text}</Text>
@@ -158,14 +157,20 @@ export default function ChatGroupScreen() {
               </Pressable>
             );
           })}
-          <Text style={styles.pollTotal}>{totalVotes} voto(s)</Text>
+          <Text style={styles.pollTotal}>
+            {totalVotes} voto(s){myVote ? " · toque em outra opção para alterar" : ""}
+          </Text>
         </View>
       );
     }
 
     return (
       <MessageBubble
-        sender={item.senderId === userId ? "Você" : item.senderId}
+        sender={
+          item.senderId === userId
+            ? "Você"
+            : item.senderName || item.senderId
+        }
         text={item.text}
         time={item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : undefined}
         variant={item.senderId === userId ? "outgoing" : "incoming"}
