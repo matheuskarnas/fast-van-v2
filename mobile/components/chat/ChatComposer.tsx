@@ -20,9 +20,6 @@ export function ChatComposer({
 }: ChatComposerProps) {
   return (
     <View style={styles.container}>
-      <View style={styles.plusButton}>
-        <Text style={styles.plusText}>+</Text>
-      </View>
       <TextInput
         placeholder={placeholder}
         value={value}
@@ -30,9 +27,6 @@ export function ChatComposer({
         style={styles.input}
         placeholderTextColor={theme.colors.text.muted}
       />
-      <View style={styles.emojiButton}>
-        <Text style={styles.emojiText}>☺</Text>
-      </View>
       <Pressable style={styles.sendButton} onPress={onSend} disabled={disabled}>
         <Text style={styles.sendText}>{sendLabel}</Text>
       </Pressable>
@@ -50,39 +44,14 @@ const styles = StyleSheet.create({
     borderTopColor: theme.colors.border.soft,
     backgroundColor: theme.colors.background.card,
   },
-  plusButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: theme.colors.background.muted,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  plusText: {
-    color: theme.colors.text.secondary,
-    fontSize: 24,
-    fontWeight: "600",
-    marginTop: -2,
-  },
   input: {
     flex: 1,
-    minHeight: 44,
-    borderRadius: 22,
-    paddingHorizontal: theme.spacing.md,
+    minHeight: 48,
+    borderRadius: theme.radius.pill,
+    paddingHorizontal: theme.spacing.lg,
     backgroundColor: theme.colors.background.input,
     color: theme.colors.text.primary,
-  },
-  emojiButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: theme.colors.background.muted,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emojiText: {
-    color: theme.colors.text.secondary,
-    fontSize: 18,
+    fontSize: theme.font.md,
   },
   sendButton: {
     width: 50,
@@ -98,7 +67,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   sendText: {
-    color: theme.colors.text.primary,
+    color: theme.colors.text.inverse,
     fontSize: 18,
     fontWeight: "900",
   },

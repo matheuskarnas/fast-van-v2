@@ -2,11 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   StyleSheet,
   View,
 } from "react-native";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useLocalSearchParams } from "expo-router";
 import {
   getPrivateMessages,
@@ -18,6 +17,7 @@ import { theme } from "../../../../constants/theme";
 import { ChatComposer } from "../../../../components/chat/ChatComposer";
 import { ChatTopBar } from "../../../../components/chat/ChatTopBar";
 import { MessageBubble } from "../../../../components/chat/MessageBubble";
+import { useKeyboardInset } from "../../../../hooks/useKeyboardInset";
 
 export default function PassengerChatDetailScreen() {
   const { id, otherUserName } = useLocalSearchParams();
@@ -29,6 +29,8 @@ export default function PassengerChatDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [userId, setUserId] = useState("");
+  const tabBarHeight = useBottomTabBarHeight();
+  const keyboardInset = useKeyboardInset(tabBarHeight);
 
   const conversationLabel = useMemo(
     () => {
@@ -93,14 +95,10 @@ export default function PassengerChatDetailScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={styles.container}
-    >
+    <View style={styles.container}>
       <ChatTopBar
         title={conversationLabel}
         subtitle="Chat privado com o motorista"
-        statusLabel="AGUARDANDO RESPOSTA"
       />
 
       {loading ? (
@@ -111,7 +109,8 @@ export default function PassengerChatDetailScreen() {
         <FlatList
           data={messages}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.messages}
+          contentContainerStyle={[styles.messages, { paddingBottom: theme.spacing.md + keyboardInset }]}
+          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <MessageBubble
@@ -135,15 +134,17 @@ export default function PassengerChatDetailScreen() {
         />
       )}
 
-      <ChatComposer
-        value={text}
-        onChangeText={setText}
-        onSend={handleSend}
-        sendLabel={sending ? "..." : "→"}
-        disabled={sending}
-        placeholder="Mensagem"
-      />
-    </KeyboardAvoidingView>
+      <View style={[styles.composerArea, { marginBottom: keyboardInset }]}>
+        <ChatComposer
+          value={text}
+          onChangeText={setText}
+          onSend={handleSend}
+          sendLabel={sending ? "..." : "→"}
+          disabled={sending}
+          placeholder="Mensagem"
+        />
+      </View>
+    </View>
   );
 }
 
@@ -160,7 +161,9 @@ const styles = StyleSheet.create({
   messages: {
     paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.md,
     gap: theme.spacing.md,
+  },
+  composerArea: {
+    backgroundColor: theme.colors.background.card,
   },
 });

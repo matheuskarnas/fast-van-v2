@@ -208,14 +208,15 @@ export default function ChatGroupScreen() {
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={80}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
       >
         <FlatList
           ref={flatListRef}
           data={messages}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.messageList}
+          keyboardShouldPersistTaps="handled"
           renderItem={renderMessage}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
           ListEmptyComponent={
