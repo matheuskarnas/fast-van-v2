@@ -1,11 +1,21 @@
-import { Link } from "expo-router";
-import { ActivityIndicator, ScrollView, View, Text, StyleSheet } from "react-native";
-import { useEffect, useState } from "react";
-import { getSession } from "../../../services/session";
-import { ActionCard } from "../../../components/common/ActionCard";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import {
+  ActivityIndicator,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { ApiEndpoints } from "../../../constants/api";
 import { theme } from "../../../constants/theme";
 import { apiService } from "../../../services/api";
-import { ApiEndpoints } from "../../../constants/api";
+import { getDriverLines, type Line } from "../../../services/driverLines";
+import { getSession } from "../../../services/session";
 
 interface DriverRatings {
   totalRatings: number;
@@ -19,227 +29,356 @@ interface DriverRatings {
   };
 }
 
-const RATING_LABELS = [
-  { key: "punctuality", label: "Pontualidade" },
-  { key: "driving", label: "Direção" },
-  { key: "friendliness", label: "Simpatia" },
-  { key: "comfort", label: "Conforto" },
-  { key: "vehicleQuality", label: "Veículo" },
-  { key: "hygiene", label: "Higiene" },
-] as const;
-
 function averageScore(averages: DriverRatings["averages"]) {
   const values = Object.values(averages);
+  if (!values.length) return 0;
   return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
 }
 
+function formatDays(days?: string) {
+  if (!days) return "Dias não definidos";
+  return days
+    .split(",")
+    .map((day) => day.trim())
+    .filter(Boolean)
+    .slice(0, 5)
+    .join(", ");
+}
+
 export default function DriverHomeScreen() {
+  const router = useRouter();
   const [name, setName] = useState("Motorista");
+  const [driverId, setDriverId] = useState("");
+  const [lines, setLines] = useState<Line[]>([]);
   const [ratings, setRatings] = useState<DriverRatings | null>(null);
-  const [loadingRatings, setLoadingRatings] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadSession = async () => {
       const session = await getSession();
-      if (session?.userName) {
-        setName(session.userName);
-      }
-      if (session?.userId) {
-        try {
-          const url = ApiEndpoints.GET_DRIVER_RATINGS.replace(":driverId", session.userId);
-          const response = await apiService.get<{ success: boolean } & DriverRatings>(url);
-          if (response.data.success) {
-            setRatings({
-              totalRatings: response.data.totalRatings ?? 0,
-              averages: response.data.averages,
-            });
-          }
-        } catch {
-          setRatings(null);
-        }
-      }
-      setLoadingRatings(false);
+      if (session?.userName) setName(session.userName);
+      if (session?.userId) setDriverId(session.userId);
     };
-
     loadSession();
   }, []);
 
+  const load = useCallback(async () => {
+    setLoading(true);
+
+    try {
+      const linesResult = await getDriverLines();
+      if (linesResult.success) setLines(linesResult.lines ?? []);
+    } catch {
+      setLines([]);
+    }
+
+    try {
+      const ratingsResult = driverId
+        ? await apiService.get<{ success: boolean } & DriverRatings>(
+            ApiEndpoints.GET_DRIVER_RATINGS.replace(":driverId", driverId),
+          )
+        : null;
+      const ratingData = ratingsResult?.data;
+      if (ratingData?.success) {
+        setRatings({
+          totalRatings: ratingData.totalRatings ?? 0,
+          averages: ratingData.averages,
+        });
+      }
+    } catch {
+      setRatings(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [driverId]);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const totalPassengers = lines.reduce((sum, line) => sum + (line.passengerCount ?? 0), 0);
+  const totalCapacity = lines.reduce((sum, line) => sum + (line.capacity ?? 0), 0);
+  const occupancy = totalCapacity ? Math.round((totalPassengers / totalCapacity) * 100) : 0;
+  const marketplaceLines = lines.filter((line: any) => line.marketplaceEnabled).length;
+  const mainLine = useMemo(() => {
+    return [...lines].sort((a, b) => (b.passengerCount ?? 0) - (a.passengerCount ?? 0))[0];
+  }, [lines]);
   const overallRating = ratings ? averageScore(ratings.averages) : 0;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.kicker}>Bem-vindo</Text>
-      <Text style={styles.title}>{name}</Text>
-      <Text style={styles.subtitle}>
-        Acesse os fluxos de linha, geofencing e chat pelo painel abaixo.
-      </Text>
-
-      <View style={styles.ratingCard}>
-        <View style={styles.ratingHeader}>
-          <View>
-            <Text style={styles.cardEyebrow}>Avaliações</Text>
-            <Text style={styles.ratingTitle}>Feedback dos passageiros</Text>
-          </View>
-          {loadingRatings ? (
-            <ActivityIndicator size="small" color={theme.colors.brand.orange} />
-          ) : (
-            <View style={styles.scoreBadge}>
-              <Text style={styles.scoreValue}>{overallRating.toFixed(1)}</Text>
-              <Text style={styles.scoreMax}>/5</Text>
-            </View>
-          )}
+    <SafeAreaView style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <Text style={styles.kicker}>Painel do motorista</Text>
+          <Text style={styles.title}>{name}</Text>
+          <Text style={styles.subtitle}>Operação, passageiros e reputação em uma visão rápida.</Text>
         </View>
 
-        {loadingRatings ? (
-          <Text style={styles.ratingMuted}>Carregando médias...</Text>
-        ) : ratings && ratings.totalRatings > 0 ? (
+        {loading ? (
+          <View style={styles.loadingCard}>
+            <ActivityIndicator color={theme.colors.brand.orange} />
+            <Text style={styles.muted}>Carregando sua operação...</Text>
+          </View>
+        ) : (
           <>
-            <Text style={styles.ratingMuted}>
-              {ratings.totalRatings} avaliação{ratings.totalRatings === 1 ? "" : "ões"} recebida{ratings.totalRatings === 1 ? "" : "s"}
-            </Text>
-            <View style={styles.criteriaGrid}>
-              {RATING_LABELS.map((item) => (
-                <View key={item.key} style={styles.criteriaItem}>
-                  <Text style={styles.criteriaLabel}>{item.label}</Text>
-                  <Text style={styles.criteriaValue}>{ratings.averages[item.key].toFixed(1)}</Text>
+            <View style={styles.heroCard}>
+              <View style={styles.heroHeader}>
+                <View style={styles.heroTitleGroup}>
+                  <Text style={styles.heroLabel}>Linha em destaque</Text>
+                  <Text style={styles.heroTitle}>{mainLine?.name ?? "Nenhuma linha criada"}</Text>
                 </View>
-              ))}
+                <View style={styles.occupancyBadge}>
+                  <Text style={styles.occupancyValue}>{occupancy}%</Text>
+                  <Text style={styles.occupancyLabel}>ocupação</Text>
+                </View>
+              </View>
+              <Text style={styles.heroRoute} numberOfLines={1}>
+                {mainLine ? `${mainLine.originCity} -> ${mainLine.destinationPlace}` : "Crie sua primeira linha para iniciar a operação"}
+              </Text>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${Math.min(occupancy, 100)}%` }]} />
+              </View>
+              <View style={styles.heroInfoRow}>
+                <InfoPill icon="people-outline" label={`${totalPassengers}/${totalCapacity || 0} passageiros`} />
+                <InfoPill icon="calendar-outline" label={formatDays(mainLine?.daysOfWeek)} />
+              </View>
+              <Pressable style={styles.primaryButton} onPress={() => router.push("/(app)/(driver)/lines")}>
+                <Text style={styles.primaryButtonText}>Gerenciar linhas</Text>
+                <Ionicons name="chevron-forward" size={18} color={theme.colors.text.inverse} />
+              </Pressable>
+            </View>
+
+            <View style={styles.statsRow}>
+              <StatCard value={String(lines.length)} label="linhas" icon="map-outline" />
+              <StatCard value={String(totalPassengers)} label="passageiros" icon="people-outline" />
+              <StatCard value={String(marketplaceLines)} label="anúncios" icon="storefront-outline" />
+            </View>
+
+            <View style={styles.ratingCard}>
+              <View style={styles.ratingIcon}>
+                <Ionicons name="star" size={22} color={theme.colors.brand.orange} />
+              </View>
+              <View style={styles.ratingBody}>
+                <Text style={styles.ratingTitle}>Avaliação dos passageiros</Text>
+                <Text style={styles.ratingText}>
+                  {ratings && ratings.totalRatings > 0
+                    ? `${ratings.totalRatings} avaliação${ratings.totalRatings === 1 ? "" : "ões"} recebida${ratings.totalRatings === 1 ? "" : "s"}`
+                    : "As notas aparecem aqui quando os passageiros avaliarem."}
+                </Text>
+              </View>
+              <View style={styles.ratingScore}>
+                <Text style={styles.ratingScoreValue}>{overallRating.toFixed(1)}</Text>
+                <Text style={styles.ratingScoreMax}>/5</Text>
+              </View>
+            </View>
+
+            <Text style={styles.sectionTitle}>Ações rápidas</Text>
+            <View style={styles.actionsGrid}>
+              <HomeAction
+                icon="play-circle-outline"
+                title="Operação"
+                description="Iniciar viagem e registrar ocorrências"
+                onPress={() => router.push("/(app)/(driver)/lines")}
+              />
+              <HomeAction
+                icon="cash-outline"
+                title="Ganhos"
+                description="Mensalidades e lançamentos"
+                onPress={() => router.push("/(app)/(driver)/earnings")}
+              />
+              <HomeAction
+                icon="storefront-outline"
+                title="Marketplace"
+                description="Anunciar linha e ver demandas"
+                onPress={() => router.push("/(app)/shared/marketplace" as any)}
+              />
+              <HomeAction
+                icon="chatbubble-ellipses-outline"
+                title="Chat"
+                description="Conversar com passageiros"
+                onPress={() => router.push("/(app)/(driver)/chat")}
+              />
             </View>
           </>
-        ) : (
-          <Text style={styles.ratingMuted}>
-            As médias aparecem aqui quando os passageiros avaliarem suas viagens.
-          </Text>
         )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function InfoPill({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string }) {
+  return (
+    <View style={styles.infoPill}>
+      <Ionicons name={icon} size={13} color={theme.colors.brand.navy} />
+      <Text style={styles.infoPillText}>{label}</Text>
+    </View>
+  );
+}
+
+function StatCard({ value, label, icon }: { value: string; label: string; icon: keyof typeof Ionicons.glyphMap }) {
+  return (
+    <View style={styles.statCard}>
+      <Ionicons name={icon} size={18} color={theme.colors.brand.orange} />
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function HomeAction({
+  icon,
+  title,
+  description,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  description: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={styles.actionCard} onPress={onPress}>
+      <View style={styles.actionIcon}>
+        <Ionicons name={icon} size={20} color={theme.colors.brand.navy} />
       </View>
-
-      <Link href={"/(app)/shared/marketplace" as any} asChild>
-        <ActionCard
-          title="Marketplace"
-          description="Anuncie linhas e veja demandas de eventos ou empresas."
-        />
-      </Link>
-
-      <Link href="/(app)/shared/maps" asChild>
-        <ActionCard
-          title="RF7 - Geofencing"
-          description="Criar linha, iniciar execução e registrar check-ins."
-        />
-      </Link>
-
-      <Link href="/(app)/(driver)/chat" asChild>
-        <ActionCard
-          title="Chat privado"
-          description="Iniciar conversa com passageiro por ID."
-        />
-      </Link>
-    </ScrollView>
+      <Text style={styles.actionTitle}>{title}</Text>
+      <Text style={styles.actionDescription}>{description}</Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: { flex: 1, backgroundColor: theme.colors.background.app },
+  content: {
     padding: theme.spacing.xl,
     paddingBottom: theme.spacing.xxl,
-    backgroundColor: theme.colors.background.app,
-    gap: 16,
+    gap: theme.spacing.lg,
   },
+  header: { gap: theme.spacing.xs },
   kicker: {
-    marginTop: 12,
-    color: theme.colors.text.brand,
+    marginTop: theme.spacing.sm,
+    color: theme.colors.brand.orange,
     textTransform: "uppercase",
-    letterSpacing: 1.2,
-    fontWeight: "700",
+    fontSize: theme.font.xs,
+    fontWeight: "900",
   },
-  title: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: theme.colors.text.brand,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: theme.colors.text.secondary,
-    lineHeight: 22,
-    marginBottom: 8,
-  },
-  ratingCard: {
-    backgroundColor: theme.colors.background.card,
+  title: { fontSize: 32, fontWeight: "900", color: theme.colors.text.brand },
+  subtitle: { fontSize: theme.font.md, color: theme.colors.text.secondary, lineHeight: 22 },
+  loadingCard: {
+    minHeight: 180,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.spacing.sm,
     borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border.soft,
-    padding: theme.spacing.lg,
-    gap: theme.spacing.md,
+    backgroundColor: theme.colors.background.card,
     ...theme.shadow.card,
   },
-  ratingHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  muted: { color: theme.colors.text.secondary, fontSize: theme.font.sm },
+  heroCard: {
+    backgroundColor: theme.colors.brand.navy,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
     gap: theme.spacing.md,
   },
-  cardEyebrow: {
-    fontSize: theme.font.xs,
-    fontWeight: "800",
-    color: theme.colors.brand.orange,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  ratingTitle: {
-    fontSize: theme.font.md,
-    fontWeight: "800",
-    color: theme.colors.text.primary,
-    marginTop: 2,
-  },
-  scoreBadge: {
-    minWidth: 64,
-    minHeight: 42,
-    flexDirection: "row",
-    alignItems: "baseline",
+  heroHeader: { flexDirection: "row", justifyContent: "space-between", gap: theme.spacing.md },
+  heroTitleGroup: { flex: 1 },
+  heroLabel: { color: "rgba(255,255,255,0.72)", fontSize: theme.font.sm, fontWeight: "700" },
+  heroTitle: { marginTop: 4, color: theme.colors.text.inverse, fontSize: theme.font.xl, fontWeight: "900" },
+  heroRoute: { color: "rgba(255,255,255,0.78)", fontSize: theme.font.sm },
+  occupancyBadge: {
+    minWidth: 78,
+    alignItems: "center",
     justifyContent: "center",
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.brand.orange + "15",
-    borderWidth: 1,
-    borderColor: theme.colors.brand.orange + "40",
-    paddingHorizontal: theme.spacing.sm,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    padding: theme.spacing.sm,
   },
-  scoreValue: {
-    fontSize: theme.font.xl,
-    fontWeight: "900",
-    color: theme.colors.brand.orange,
+  occupancyValue: { color: theme.colors.text.inverse, fontSize: theme.font.lg, fontWeight: "900" },
+  occupancyLabel: { color: "rgba(255,255,255,0.72)", fontSize: theme.font.xs, fontWeight: "700" },
+  progressTrack: {
+    height: 8,
+    borderRadius: theme.radius.pill,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    overflow: "hidden",
   },
-  scoreMax: {
-    fontSize: theme.font.sm,
-    fontWeight: "700",
-    color: theme.colors.text.secondary,
-  },
-  ratingMuted: {
-    fontSize: theme.font.sm,
-    color: theme.colors.text.secondary,
-    lineHeight: 20,
-  },
-  criteriaGrid: {
+  progressFill: { height: "100%", borderRadius: theme.radius.pill, backgroundColor: theme.colors.brand.orange },
+  heroInfoRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
+  infoPill: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.sm,
-  },
-  criteriaItem: {
-    width: "48%",
-    minHeight: 54,
-    justifyContent: "center",
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.background.muted,
+    alignItems: "center",
+    gap: theme.spacing.xs,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.background.card,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
   },
-  criteriaLabel: {
-    fontSize: theme.font.xs,
-    color: theme.colors.text.secondary,
-    fontWeight: "700",
+  infoPillText: { color: theme.colors.text.primary, fontSize: theme.font.xs, fontWeight: "800" },
+  primaryButton: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.spacing.sm,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.brand.orange,
   },
-  criteriaValue: {
-    fontSize: theme.font.lg,
-    color: theme.colors.text.primary,
-    fontWeight: "900",
-    marginTop: 2,
+  primaryButtonText: { color: theme.colors.text.inverse, fontSize: theme.font.md, fontWeight: "900" },
+  statsRow: { flexDirection: "row", gap: theme.spacing.sm },
+  statCard: {
+    flex: 1,
+    minHeight: 92,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.spacing.xs,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.background.card,
+    borderWidth: 1,
+    borderColor: theme.colors.border.soft,
   },
+  statValue: { fontSize: theme.font.xl, fontWeight: "900", color: theme.colors.text.primary },
+  statLabel: { fontSize: theme.font.xs, fontWeight: "700", color: theme.colors.text.secondary },
+  ratingCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.background.card,
+    borderWidth: 1,
+    borderColor: theme.colors.border.soft,
+    padding: theme.spacing.md,
+  },
+  ratingIcon: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.brand.orange + "18",
+  },
+  ratingBody: { flex: 1 },
+  ratingTitle: { fontSize: theme.font.md, fontWeight: "900", color: theme.colors.text.primary },
+  ratingText: { marginTop: 2, fontSize: theme.font.sm, color: theme.colors.text.secondary },
+  ratingScore: { flexDirection: "row", alignItems: "baseline" },
+  ratingScoreValue: { fontSize: theme.font.xl, fontWeight: "900", color: theme.colors.brand.orange },
+  ratingScoreMax: { fontSize: theme.font.sm, fontWeight: "800", color: theme.colors.text.secondary },
+  sectionTitle: { fontSize: theme.font.lg, fontWeight: "900", color: theme.colors.text.primary },
+  actionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
+  actionCard: {
+    width: "48.5%",
+    minHeight: 132,
+    justifyContent: "space-between",
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.background.card,
+    borderWidth: 1,
+    borderColor: theme.colors.border.soft,
+    padding: theme.spacing.md,
+  },
+  actionIcon: {
+    width: 38,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.background.muted,
+  },
+  actionTitle: { fontSize: theme.font.md, fontWeight: "900", color: theme.colors.text.primary },
+  actionDescription: { fontSize: theme.font.xs, lineHeight: 17, color: theme.colors.text.secondary },
 });

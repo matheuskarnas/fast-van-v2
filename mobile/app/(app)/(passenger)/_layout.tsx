@@ -85,6 +85,30 @@ export default function PassengerLayout() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="suggest-point"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: "Dashboard",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="speedometer-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="accept-invite"
+        options={{
+          title: "Convite",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="ticket-outline" color={color} size={size} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
